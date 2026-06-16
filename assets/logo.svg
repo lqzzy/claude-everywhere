@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="Claude Everywhere">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF7F0"/>
+      <stop offset="1" stop-color="#FFE4D5"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="60" y1="60" x2="150" y2="130" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFAE8F"/>
+      <stop offset="1" stop-color="#FF6F52"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#bg)"/>
+  <g transform="translate(-10,0)">
+    <path d="M132 66 A42 42 0 1 0 132 126" fill="none" stroke="url(#coral)" stroke-width="22" stroke-linecap="round"/>
+    <circle cx="150" cy="96" r="12" fill="#FF6F52"/>
+  </g>
+</svg>
