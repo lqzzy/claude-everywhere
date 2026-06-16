@@ -4,7 +4,7 @@ Use the **Claude Code** running on your computer from your phone, as if you were
 
 - **One-command setup on your computer**: `./install.sh` — installs deps, generates a token, prints a QR code, and starts the service.
 - **One-tap connect on your phone**: scan the QR code in your terminal with the camera; the app fills in the address and token and connects automatically.
-- **Your data stays on your devices**: the service runs on your own machine and traffic goes over Tailscale (encrypted). No third-party cloud.
+- **Your data stays on your devices**: the service runs on your own machine and traffic goes over [Tailscale](https://tailscale.com) (a private, encrypted WireGuard network). No third-party cloud.
 
 ```
 Phone app  ──WebSocket──>  relay service (Node/TS, Agent SDK)  ──resume per turn──>  claude
@@ -15,11 +15,59 @@ Phone app  ──WebSocket──>  relay service (Node/TS, Agent SDK)  ──res
 
 ---
 
+## Prerequisites
+
+- **Node ≥ 20** on the computer.
+- **[Claude Code](https://claude.com/claude-code)** installed and signed in on the computer (the relay drives it via the Agent SDK).
+- **[Tailscale](https://tailscale.com)** on both the computer and the phone — this is how the phone reaches your computer from any network (cellular, another Wi-Fi, …). It's free for personal use. See the next section.
+
+> Without Tailscale you can still use it, but only when the phone and computer are on the **same Wi-Fi** (the installer falls back to your LAN IP).
+
+---
+
+## Set up Tailscale
+
+Tailscale puts your computer and phone on the same private, encrypted network. Each device gets a stable `100.x.y.z` address, and the phone can reach the computer from anywhere — without exposing any port to the public internet.
+
+### 1. On the computer
+
+**macOS**
+```bash
+brew install --cask tailscale     # or install "Tailscale" from the Mac App Store
+```
+Open the Tailscale app and sign in (Google / GitHub / email). That's it — it now runs in the menu bar.
+
+> The App Store/cask build keeps its CLI inside the app bundle at
+> `/Applications/Tailscale.app/Contents/MacOS/Tailscale`. `install.sh` looks there automatically.
+> To use `tailscale` directly in your shell, symlink it once:
+> `sudo ln -sf /Applications/Tailscale.app/Contents/MacOS/Tailscale /usr/local/bin/tailscale`
+
+**Linux**
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up                 # prints a login URL — open it and sign in
+```
+
+### 2. On the phone (Android)
+
+1. Install **Tailscale** from Google Play.
+2. Sign in with the **same account** you used on the computer.
+3. Toggle the VPN **on** (you'll see a key icon in the status bar).
+
+### 3. Verify
+
+On the computer:
+```bash
+tailscale status          # should list your phone as a device
+tailscale ip -4           # your computer's Tailscale IP (the 100.x the installer uses)
+```
+If your phone shows up here, you're ready. (Keep Tailscale enabled on the phone whenever you want to connect.)
+
+---
+
 ## Quick start
 
-### 1. On your computer (macOS / Linux)
-
-Requirements: Node ≥ 20, [Claude Code](https://claude.com/claude-code) installed and logged in, and ideally [Tailscale](https://tailscale.com) (so the phone can reach the computer from any network, encrypted; otherwise you must be on the same LAN).
+### 1. On your computer
 
 ```bash
 git clone <this-repo> claude-everywhere
@@ -27,13 +75,11 @@ cd claude-everywhere
 ./install.sh
 ```
 
-The script will automatically: install dependencies → generate an `AUTH_TOKEN` on first run (saved to `server/.env`) → detect your Tailscale/LAN IP → **print a QR code in the terminal** → start the service (`ws://0.0.0.0:4000`).
+The script checks prerequisites, then: installs dependencies → generates an `AUTH_TOKEN` on first run (saved to `server/.env`) → detects your Tailscale (or LAN) IP → **prints a QR code in the terminal** → starts the service (`ws://0.0.0.0:4000`).
 
 ### 2. On your phone (Android)
 
-Install the app (see "Building the app" below). On first launch you'll see the **Connect** screen — **scan the QR code in your terminal with the phone camera**, and the app fills in the server address and token and connects. If scanning doesn't work, you can paste them manually on that screen.
-
-> With Tailscale, the phone must be signed in to the same Tailscale account and have it enabled; without Tailscale, the phone and computer must be on the same Wi-Fi.
+Install the app (see "Building the app" below). On first launch you'll see the **Connect** screen — **scan the QR code in your terminal with the phone camera**, and the app fills in the server address and token and connects. If scanning doesn't work, paste them manually on that screen.
 
 ---
 
@@ -68,6 +114,10 @@ Native Kotlin + Jetpack Compose, minSdk 31. No Node/Metro required.
 | `DEFAULT_CWD` | Default working directory for sessions started from the app (defaults to the user's home). |
 | `CONTEXT_LIMIT` | Denominator for the Context% gauge; set `1000000` for Opus 1M context, default 200000 (corrected at runtime using the model's real window). |
 | `PORT` / `HOST` | Listen port/address, default `4000` / `0.0.0.0`. |
+
+## Security
+
+Traffic runs over Tailscale, which is already encrypted end-to-end (WireGuard), so the relay speaks plain `ws://` inside that private tunnel and relies on a single bearer `AUTH_TOKEN`. Don't expose port 4000 to the public internet directly — keep it on your tailnet (or LAN). The token lives in `server/.env`, which is git-ignored; rotate it by deleting the `AUTH_TOKEN` line and re-running `./install.sh` (then re-scan on the phone).
 
 ## Permissions
 
