@@ -1,0 +1,103 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<style>
+:root{
+  --ink:#f4f5fb; --dim:#a7adc8; --g1:#8b5cf6; --g2:#22d3ee; --ok:#4ade80;
+  --glass:rgba(255,255,255,.06); --glassb:rgba(255,255,255,.12); --code-bg:rgba(8,10,22,.55);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+html,body{width:393px;color:var(--ink);font-family:"Inter",-apple-system,"PingFang SC",sans-serif;
+  background:#0a0a16;position:relative;overflow-x:hidden}
+.bgblob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;z-index:0}
+.b1{width:300px;height:300px;background:#7c3aed;top:-60px;left:-70px}
+.b2{width:280px;height:280px;background:#0ea5e9;top:120px;right:-90px;opacity:.45}
+.b3{width:320px;height:320px;background:#db2777;bottom:40px;left:-80px;opacity:.32}
+.wrap{position:relative;z-index:1}
+.statusbar{display:flex;justify-content:space-between;padding:14px 22px 6px;font-size:13px;font-weight:600}
+.statusbar .right{font-size:12px;color:var(--dim)}
+.hdr{display:flex;align-items:center;gap:11px;padding:8px 16px 12px}
+.hdr .back{color:var(--dim);font-size:22px}
+.hdr .t{flex:1}
+.hdr .t .n{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.hdr .t .s{font-size:11.5px;color:var(--dim)}
+.hdr .orb{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--g1),var(--g2));box-shadow:0 0 18px rgba(139,92,246,.6)}
+.glasscard{margin:0 16px 12px;background:var(--glass);border:1px solid var(--glassb);border-radius:18px;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:12px 15px}
+.meter .r1{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:8px}
+.meter .r1 b{color:var(--ink)}
+.bar{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar>span{display:block;height:100%;width:24%;background:linear-gradient(90deg,var(--g1),var(--g2));border-radius:3px}
+.feed{padding:4px 16px}
+.user{display:flex;justify-content:flex-end;margin:13px 0}
+.user .b{background:linear-gradient(135deg,rgba(139,92,246,.9),rgba(34,211,238,.85));color:#fff;
+  border-radius:18px 18px 5px 18px;padding:10px 14px;font-size:14.5px;max-width:82%;line-height:1.5;box-shadow:0 6px 20px rgba(124,58,237,.3)}
+.ai{background:var(--glass);border:1px solid var(--glassb);border-radius:18px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:13px 15px;margin:13px 0}
+.ai p{font-size:14.5px;line-height:1.6;margin:8px 0}.ai p:first-child{margin-top:0}
+.ai ol{margin:8px 0 4px;padding-left:20px}
+.ai ol li{font-size:14.5px;line-height:1.68;margin:3px 0}
+.ai ol li::marker{color:var(--g2)}
+code.inl{background:rgba(255,255,255,.1);color:#c4b5fd;font-family:"SF Mono",monospace;font-size:12.5px;padding:1.5px 6px;border-radius:6px}
+.codeblock{background:var(--code-bg);border:1px solid var(--glassb);border-radius:13px;margin:10px 0;overflow:hidden}
+.codeblock .cbhead{display:flex;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--glassb);font-size:11px;color:var(--dim);font-family:"SF Mono",monospace}
+.codeblock pre{padding:11px 13px;font-family:"SF Mono",monospace;font-size:12.5px;line-height:1.62;overflow:auto}
+.kw{color:#f0abfc}.str{color:#86efac}.fn{color:#7dd3fc}.cm{color:#7a82a8}.ty{color:#5eead4}
+.tool{background:var(--glass);border:1px solid var(--glassb);border-radius:14px;margin:9px 0;overflow:hidden;backdrop-filter:blur(12px)}
+.tool .th{display:flex;align-items:center;gap:10px;padding:11px 14px}
+.tool .chev{color:var(--dim);font-size:10px}
+.tool .ic{font-family:"SF Mono",monospace;font-weight:700;width:15px;text-align:center;background:linear-gradient(135deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tool .lb{flex:1;font-family:"SF Mono",monospace;font-size:12.5px;color:#d6d9ee}
+.tool .st.ok{color:var(--ok);font-weight:700}
+.tool .body{border-top:1px solid var(--glassb);padding:10px 13px;background:var(--code-bg)}
+.diff{font-family:"SF Mono",monospace;font-size:12px;line-height:1.65}
+.diff .del{color:#fca5a5;background:rgba(239,68,68,.12);display:block}
+.diff .add{color:#86efac;background:rgba(34,197,94,.12);display:block}
+.diff .ctx{color:var(--dim);display:block}
+.live{margin:11px 18px;font-size:12px;font-family:"SF Mono",monospace;display:flex;gap:8px;align-items:center;
+  background:linear-gradient(90deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.live .d{width:7px;height:7px;border-radius:50%;background:var(--g2);box-shadow:0 0 8px var(--g2)}
+.composer{position:sticky;bottom:0;padding:14px 16px 18px;display:flex;gap:10px;align-items:center}
+.composer .field{flex:1;background:var(--glass);border:1px solid var(--glassb);border-radius:22px;padding:12px 16px;color:var(--dim);font-size:14.5px;backdrop-filter:blur(20px)}
+.composer .send{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;display:grid;place-items:center;font-size:18px;font-weight:700;box-shadow:0 4px 16px rgba(124,58,237,.5)}
+</style></head>
+<body>
+  <div class="bgblob b1"></div><div class="bgblob b2"></div><div class="bgblob b3"></div>
+  <div class="wrap">
+  <div class="statusbar"><span>9:41</span><span class="right">5G ▪▪▪ 84%</span></div>
+  <div class="hdr"><span class="back">‹</span><div class="t"><div class="n">auth 模块重构</div><div class="s">Opus 4.8 · 空闲</div></div><div class="orb"></div></div>
+  <div class="glasscard meter">
+    <div class="r1"><span>Context</span><span><b>24%</b> · 47k/200k</span></div>
+    <div class="bar"><span></span></div>
+    <div class="r1" style="margin:8px 0 0"><span>累计</span><span><b>12.3k</b> tok · <b>$0.21</b></span></div>
+  </div>
+  <div class="feed">
+    <div class="user"><div class="b">把 login 改成 async/await,并补上单元测试</div></div>
+    <div class="ai">
+      <p>好的。我先读现有实现,然后分三步重构:</p>
+      <ol>
+        <li>把 <code class="inl">login()</code> 由回调改为 <code class="inl">async</code></li>
+        <li>替换 3 处 <code class="inl">callback</code> 调用点</li>
+        <li>新增 <code class="inl">auth.test.ts</code></li>
+      </ol>
+      <div class="codeblock">
+        <div class="cbhead"><span>auth.ts</span><span>TypeScript</span></div>
+<pre><span class="kw">export async function</span> <span class="fn">login</span>(u, p) {
+  <span class="kw">const</span> r = <span class="kw">await</span> <span class="fn">api</span>(<span class="str">"/login"</span>, { u, p });
+  <span class="kw">if</span> (!r.ok) <span class="kw">throw new</span> <span class="fn">AuthError</span>(r.msg);
+  <span class="kw">return</span> r.token;
+}</pre>
+      </div>
+      <div class="tool"><div class="th"><span class="chev">▶</span><span class="ic">$</span><span class="lb">npm test</span><span class="st ok">✓</span></div></div>
+      <div class="tool">
+        <div class="th"><span class="chev">▼</span><span class="ic">✎</span><span class="lb">auth.ts</span><span class="st ok">✓</span></div>
+        <div class="body"><div class="diff">
+          <span class="ctx">  export function login(u, p, cb) {</span>
+          <span class="del">-   api("/login", {u,p}, cb)</span>
+          <span class="add">+ export async function login(u, p) {</span>
+          <span class="add">+   const r = await api("/login", {u,p})</span>
+        </div></div>
+      </div>
+    </div>
+  </div>
+  <div class="live"><span class="d"></span>生成中 · 本轮 1.2k tok ↑ · 8s</div>
+  <div class="composer"><div class="field">发消息给 Claude…</div><div class="send">↑</div></div>
+  </div>
+</body></html>

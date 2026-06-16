@@ -1,0 +1,331 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<title>Session 管理 · d8 液态玻璃</title>
+<style>
+:root{
+  --ink:#2e2823; --dim:#a0958a; --subtle:#6f6053; --accent:#c96442; --accent2:#e58263;
+  --ok:#5a8a5a; --warn:#c98a22; --err:#c0392b;
+  --glass:rgba(255,255,255,.42); --glassS:rgba(255,255,255,.6); --glassb:rgba(255,255,255,.9);
+  --hi:inset 0 1.5px 0 rgba(255,255,255,1),inset 0 -1px 0 rgba(255,255,255,.4);
+  --sh:0 14px 40px rgba(190,150,120,.2);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
+body{background:#15161a;font-family:-apple-system,"SF Pro Text","PingFang SC",sans-serif;padding:30px;color:#fff}
+h1{font-size:19px;margin-bottom:4px}
+.lede{color:#9aa0ad;font-size:13px;margin-bottom:22px;line-height:1.5;max-width:1240px}
+.row{display:flex;gap:26px;align-items:flex-start}
+.col{width:393px;flex:0 0 393px}
+.cap{font-size:15px;font-weight:700;margin-bottom:3px}
+.cap .n{display:inline-block;background:#c96442;color:#fff;border-radius:6px;font-size:12px;padding:1px 7px;margin-right:7px}
+.sub{color:#9aa0ad;font-size:12px;margin-bottom:12px;line-height:1.45;height:34px}
+
+/* ---- 手机外壳 ---- */
+.phone{width:393px;border-radius:34px;overflow:hidden;position:relative;
+  color:var(--ink);box-shadow:0 18px 50px rgba(0,0,0,.5);border:1px solid #2c2e36}
+.screen{position:relative;min-height:760px;overflow:hidden;
+  background:linear-gradient(180deg,#fffaf6 0%,#fef4ee 55%,#fffbf8 100%)}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);z-index:0}
+.b1{width:240px;height:240px;background:#f4ab8a;top:-30px;right:-40px;opacity:.32}
+.b2{width:220px;height:220px;background:#f5cf94;bottom:160px;left:-70px;opacity:.26}
+.b3{width:240px;height:240px;background:#eda0aa;bottom:-30px;right:-50px;opacity:.22}
+.wrap{position:relative;z-index:1;padding-bottom:14px}
+
+.glass{position:relative;background:var(--glass);backdrop-filter:blur(34px) saturate(200%);-webkit-backdrop-filter:blur(34px) saturate(200%);
+  border:1px solid var(--glassb);box-shadow:var(--hi),var(--sh);overflow:hidden}
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(135deg,rgba(255,255,255,.55),rgba(255,255,255,0) 42%)}
+.glass>*{position:relative;z-index:1}
+
+.statusbar{display:flex;justify-content:space-between;padding:14px 24px 8px;font-size:13px;font-weight:600}
+.statusbar .right{font-size:12px;color:var(--dim)}
+
+/* ---- 顶部标题行 ---- */
+.head{display:flex;align-items:center;gap:9px;padding:6px 20px 10px}
+.head .h1{font-size:24px;font-weight:800;letter-spacing:.5px;flex:1}
+.head .conn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--subtle)}
+.head .cd{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px rgba(90,138,90,.7)}
+
+/* ---- 搜索 + 排序药丸 ---- */
+.toolbar{margin:0 14px 12px;border-radius:24px;padding:9px 12px 9px 16px;display:flex;align-items:center;gap:8px}
+.toolbar .mag{color:var(--dim);font-size:15px}
+.toolbar .ph{flex:1;color:var(--dim);font-size:14px}
+.seg{display:flex;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.8);border-radius:14px;padding:2px}
+.seg .o{font-size:12px;font-weight:600;color:var(--subtle);padding:5px 12px;border-radius:11px}
+.seg .o.on{background:linear-gradient(135deg,#e58263,#c96442);color:#fff;box-shadow:0 3px 9px rgba(201,100,66,.4)}
+
+/* ---- 分区标题 ---- */
+.sec{display:flex;align-items:center;gap:9px;padding:6px 22px 4px;margin-top:4px}
+.sec .lab{font-size:11.5px;font-weight:800;letter-spacing:1.4px;color:var(--accent);white-space:nowrap}
+.sec .lab.cool{color:var(--subtle)}
+.sec .ln{flex:1;height:1px;background:linear-gradient(90deg,rgba(201,100,66,.4),rgba(201,100,66,0))}
+.sec .ln.cool{background:linear-gradient(90deg,rgba(160,149,138,.4),rgba(160,149,138,0))}
+.sec .cnt{font-size:11px;color:var(--dim);font-weight:700}
+
+/* ---- 会话卡片 ---- */
+.card{margin:7px 14px;border-radius:20px;padding:13px 15px;display:flex;gap:11px;position:relative}
+.dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:0 0 9px}
+.dot.idle{background:var(--dim)}
+.dot.think{background:var(--accent);box-shadow:0 0 9px rgba(201,100,66,.7);animation:pulse 1.4s infinite}
+.dot.tool{background:var(--warn);box-shadow:0 0 9px rgba(201,138,34,.7);animation:pulse 1.4s infinite}
+.dot.perm{background:var(--err);box-shadow:0 0 10px rgba(192,57,43,.8);animation:pulse 1s infinite}
+.dot.ended{background:#bcb3a8}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.body{flex:1;min-width:0}
+.r1{display:flex;align-items:baseline;gap:8px}
+.r1 .ttl{font-size:15px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r1 .ago{font-size:11px;color:var(--dim);white-space:nowrap;flex:0 0 auto}
+.cwd{font-size:11.5px;color:var(--subtle);font-family:"SF Mono",ui-monospace,monospace;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prev{font-size:13px;color:var(--subtle);line-height:1.45;margin-top:5px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.prev .role{color:var(--accent);font-weight:700}
+.meta{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+.tag{background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.8);border-radius:9px;padding:2px 7px;font-weight:600;color:var(--subtle)}
+.tag.run{color:var(--warn);border-color:rgba(201,138,34,.3);background:rgba(201,138,34,.08)}
+.tag.term{color:var(--subtle)}
+.pin{position:absolute;top:11px;right:13px;font-size:12px;color:var(--accent);transform:rotate(20deg)}
+
+/* 需处理卡片：左侧珊瑚/红描边强调 */
+.card.attn{border:1px solid rgba(201,100,66,.28);background:rgba(255,255,255,.5)}
+.card.danger{border:1px solid rgba(192,57,43,.32);background:rgba(192,57,43,.05)}
+.act{margin-left:auto;font-size:12px;font-weight:700;color:var(--accent);display:flex;align-items:center;gap:3px}
+.act.red{color:var(--err)}
+
+/* ---- 位置分组头 ---- */
+.grp{display:flex;align-items:center;gap:8px;padding:12px 22px 4px}
+.grp .tw{color:var(--accent);font-size:11px}
+.grp .p{font-family:"SF Mono",ui-monospace,monospace;font-size:13px;font-weight:700;color:var(--ink)}
+.grp .c{font-size:11px;color:var(--dim);font-weight:700;background:rgba(255,255,255,.5);border-radius:8px;padding:1px 7px}
+
+/* ---- 多选态顶栏 ---- */
+.selbar{margin:6px 14px 12px;border-radius:22px;padding:11px 16px;display:flex;align-items:center;gap:12px}
+.selbar .x{font-size:18px;color:var(--subtle)}
+.selbar .n{flex:1;font-size:15px;font-weight:700}
+.selbar .b{font-size:13px;font-weight:700;padding:6px 14px;border-radius:13px}
+.selbar .b.arc{color:#fff;background:linear-gradient(135deg,#e0a44a,#c98a22)}
+.selbar .b.del{color:#fff;background:linear-gradient(135deg,#d65b50,#c0392b)}
+.check{width:21px;height:21px;border-radius:50%;border:2px solid var(--dim);margin-top:1px;flex:0 0 21px}
+.check.on{background:linear-gradient(135deg,#e58263,#c96442);border-color:transparent;
+  display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800}
+
+/* ---- 滑动归档：露出底层 action ---- */
+.swipe{position:relative;margin:7px 14px;border-radius:20px;overflow:hidden}
+.swipe .under{position:absolute;inset:0;display:flex;justify-content:flex-end}
+.swipe .under .a{width:78px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:800;gap:2px}
+.swipe .under .arc{background:linear-gradient(135deg,#e0a44a,#c98a22)}
+.swipe .under .del{background:linear-gradient(135deg,#d65b50,#c0392b)}
+.swipe .top{position:relative;transform:translateX(-156px);border-radius:20px}
+.swipe .top .card{margin:0}
+
+/* ---- 悬浮新建按钮 ---- */
+.fab{position:absolute;right:20px;bottom:22px;z-index:3;display:flex;align-items:center;gap:9px;
+  padding:13px 19px 13px 16px;border-radius:28px;color:#fff;font-size:15px;font-weight:700;
+  background:linear-gradient(135deg,#e58263,#c96442);
+  box-shadow:0 10px 26px rgba(201,100,66,.5),inset 0 1px 0 rgba(255,255,255,.5)}
+.fab .plus{font-size:21px;margin-top:-2px}
+</style></head>
+<body>
+<h1>Session 管理 — d8「通透液态」</h1>
+<p class="lede">和 d8 对话页同一套玻璃语言（暖白渐变底 + 光斑 + 半透玻璃卡 + 珊瑚渐变强调）。核心：① 顶部「时间 ⇄ 位置」排序切换；② 卡片直接预览最后一条对话、显示多久前活跃；③ 把「等待批准 / 运行中」的会话置顶成独立分区——手机远程控制时一眼看到谁卡住等你。状态色沿用 d8：灰=空闲、珊瑚=思考、金=工具、红=等批准。</p>
+
+<div class="row">
+
+  <!-- ============ 屏 1：主界面（需处理 + 时间流） ============ -->
+  <div class="col">
+    <div class="cap"><span class="n">1</span>主界面 · 需处理优先 + 时间流</div>
+    <div class="sub">默认形态。搜索 + 时间/位置切换；置顶分区显示等批准/运行中；其余按最近活跃。</div>
+    <div class="phone"><div class="screen">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="wrap">
+        <div class="statusbar"><span>9:41</span><span class="right">●●● ⚡ 84%</span></div>
+        <div class="head"><div class="h1">会话</div>
+          <div class="conn"><span class="cd"></span>已连接</div></div>
+
+        <div class="toolbar glass">
+          <span class="mag">⌕</span><span class="ph">搜索标题 / 内容 / 路径…</span>
+          <div class="seg"><div class="o on">时间</div><div class="o">位置</div></div>
+        </div>
+
+        <div class="sec"><span class="lab">需要你处理</span><span class="ln"></span><span class="cnt">2</span></div>
+
+        <div class="card danger glass">
+          <span class="dot perm"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">部署脚本</span><span class="ago">5 分钟前</span></div>
+            <div class="cwd">~/infra</div>
+            <div class="prev">想执行 <b>rm -rf build/</b> — 需要你批准这次操作</div>
+            <div class="meta"><span class="act red">等待批准 →</span></div>
+          </div>
+        </div>
+
+        <div class="card attn glass">
+          <span class="dot tool"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">auth 模块重构</span><span class="ago">现在</span></div>
+            <div class="cwd">~/remote-claude</div>
+            <div class="prev"><span class="role">正在</span> 跑 <b>Bash · npm test</b>…本轮 1.2k tok ↑ · 8s</div>
+            <div class="meta"><span class="tag run">◐ 运行中</span><span>Opus 4.8</span></div>
+          </div>
+        </div>
+
+        <div class="sec"><span class="lab cool">最近</span><span class="ln cool"></span></div>
+
+        <div class="card glass">
+          <span class="pin">📌</span>
+          <span class="dot idle"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">修复登录崩溃</span><span class="ago">1 小时前</span></div>
+            <div class="cwd">~/project-x</div>
+            <div class="prev"><span class="role">Claude:</span> 崩溃来自 null 解引用，已加空值守卫并补了回归测试，npm test 全绿。</div>
+            <div class="meta"><span class="tag">8.1k tok</span><span>$0.14</span></div>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <span class="dot idle"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">协议层调整</span><span class="ago">3 小时前</span></div>
+            <div class="cwd">~/remote-claude/server</div>
+            <div class="prev"><span class="role">Claude:</span> 给 ServerEvent 加了 turn 心跳事件，App 据此判断没卡死。</div>
+            <div class="meta"><span class="tag">4.0k tok</span><span>$0.07</span></div>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <span class="dot ended"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">周报草稿</span><span class="ago">昨天</span></div>
+            <div class="cwd">~/notes</div>
+            <div class="prev"><span class="role">我:</span> 帮我把这周的提交整理成三段周报…</div>
+            <div class="meta"><span class="tag term">⌨ 终端</span><span class="tag">2.0k tok</span><span>已结束</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fab"><span class="plus">＋</span>新建会话</div>
+    </div></div>
+  </div>
+
+  <!-- ============ 屏 2：按位置分组 ============ -->
+  <div class="col">
+    <div class="cap"><span class="n">2</span>按位置分组（排序切到「位置」）</div>
+    <div class="sub">同一套卡片，按 cwd 折叠分组、组内按时间。适合同时在多个项目里跑会话。</div>
+    <div class="phone"><div class="screen">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="wrap">
+        <div class="statusbar"><span>9:41</span><span class="right">●●● ⚡ 84%</span></div>
+        <div class="head"><div class="h1">会话</div>
+          <div class="conn"><span class="cd"></span>已连接</div></div>
+
+        <div class="toolbar glass">
+          <span class="mag">⌕</span><span class="ph">搜索标题 / 内容 / 路径…</span>
+          <div class="seg"><div class="o">时间</div><div class="o on">位置</div></div>
+        </div>
+
+        <div class="grp"><span class="tw">▾</span><span class="p">~/remote-claude</span><span class="c">2</span></div>
+        <div class="card attn glass">
+          <span class="dot tool"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">auth 模块重构</span><span class="ago">现在</span></div>
+            <div class="prev"><span class="role">正在</span> 跑 <b>Bash · npm test</b>…</div>
+            <div class="meta"><span class="tag run">◐ 运行中</span><span class="tag">12.3k tok</span></div>
+          </div>
+        </div>
+        <div class="card glass">
+          <span class="dot idle"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">协议层调整</span><span class="ago">3 小时前</span></div>
+            <div class="prev"><span class="role">Claude:</span> 给 ServerEvent 加了 turn 心跳事件…</div>
+            <div class="meta"><span class="tag">4.0k tok</span><span>$0.07</span></div>
+          </div>
+        </div>
+
+        <div class="grp"><span class="tw">▾</span><span class="p">~/project-x</span><span class="c">1</span></div>
+        <div class="card glass">
+          <span class="pin">📌</span>
+          <span class="dot idle"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">修复登录崩溃</span><span class="ago">1 小时前</span></div>
+            <div class="prev"><span class="role">Claude:</span> 崩溃来自 null 解引用，已加空值守卫…</div>
+            <div class="meta"><span class="tag">8.1k tok</span><span>$0.14</span></div>
+          </div>
+        </div>
+
+        <div class="grp"><span class="tw">▸</span><span class="p">~/infra</span><span class="c">1</span></div>
+
+        <div class="grp"><span class="tw">▾</span><span class="p">~/notes</span><span class="c">1</span></div>
+        <div class="card glass">
+          <span class="dot ended"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">周报草稿</span><span class="ago">昨天</span></div>
+            <div class="prev"><span class="role">我:</span> 帮我把这周的提交整理成三段周报…</div>
+            <div class="meta"><span class="tag term">⌨ 终端</span><span class="tag">2.0k tok</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- ============ 屏 3：多选 + 滑动归档 ============ -->
+  <div class="col">
+    <div class="cap"><span class="n">3</span>多选批量 · 滑动归档/删除</div>
+    <div class="sub">长按进入多选，顶栏批量归档/删除；或单卡左滑露出「归档（金）/ 删除（红）」。</div>
+    <div class="phone"><div class="screen">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+      <div class="wrap">
+        <div class="statusbar"><span>9:41</span><span class="right">●●● ⚡ 84%</span></div>
+
+        <div class="selbar glass">
+          <span class="x">✕</span><span class="n">已选 2 项</span>
+          <span class="b arc">归档</span><span class="b del">删除</span>
+        </div>
+
+        <div class="card glass" style="align-items:center">
+          <span class="check on">✓</span>
+          <div class="body">
+            <div class="r1"><span class="ttl">周报草稿</span><span class="ago">昨天</span></div>
+            <div class="cwd">~/notes</div>
+            <div class="prev"><span class="role">我:</span> 帮我把这周的提交整理成三段周报…</div>
+          </div>
+        </div>
+
+        <div class="card glass" style="align-items:center">
+          <span class="check on">✓</span>
+          <div class="body">
+            <div class="r1"><span class="ttl">旧实验 · 删掉的功能</span><span class="ago">3 天前</span></div>
+            <div class="cwd">~/sandbox</div>
+            <div class="prev"><span class="role">Claude:</span> 这个方案放弃了，已回滚改动。</div>
+          </div>
+        </div>
+
+        <div class="card glass" style="align-items:center">
+          <span class="check"></span>
+          <div class="body">
+            <div class="r1"><span class="ttl">协议层调整</span><span class="ago">3 小时前</span></div>
+            <div class="cwd">~/remote-claude/server</div>
+            <div class="prev"><span class="role">Claude:</span> 给 ServerEvent 加了 turn 心跳事件…</div>
+          </div>
+        </div>
+
+        <div class="sec"><span class="lab cool">左滑单卡 →</span><span class="ln cool"></span></div>
+
+        <div class="swipe">
+          <div class="under">
+            <div class="a arc"><span>📥</span>归档</div>
+            <div class="a del"><span>🗑</span>删除</div>
+          </div>
+          <div class="top glass">
+            <div class="card">
+              <span class="dot idle"></span>
+              <div class="body">
+                <div class="r1"><span class="ttl">修复登录崩溃</span><span class="ago">1 小时前</span></div>
+                <div class="cwd">~/project-x</div>
+                <div class="prev"><span class="role">Claude:</span> 崩溃来自 null 解引用，已加空值守卫…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div></div>
+  </div>
+
+</div>
+</body></html>

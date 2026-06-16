@@ -1,0 +1,27 @@
+# 机密:服务器令牌、本地配置
+server/.env
+**/local.properties
+
+# Node
+node_modules/
+dist/
+*.log
+
+# 系统
+.DS_Store
+
+# Android / Gradle
+.gradle/
+**/build/
+.idea/
+*.apk
+*.keystore
+*.jks
+
+# 旧 Expo app:已被 kotlin-app 取代,自带独立 git 历史,不纳入本开源仓库
+/app/
+
+# 早期探索笔记(Happy / CloudCLI 方案,已废弃,与本项目无关)
+/Happy连接流程.md
+/Happy自托管-同一会话控制.md
+/手机远程监控-CloudCLI网关.md
