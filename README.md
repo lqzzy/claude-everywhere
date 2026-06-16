@@ -79,13 +79,17 @@ The script checks prerequisites, then: installs dependencies → generates an `A
 
 ### 2. On your phone (Android)
 
-Install the app (see "Building the app" below). On first launch you'll see the **Connect** screen — **scan the QR code in your terminal with the phone camera**, and the app fills in the server address and token and connects. If scanning doesn't work, paste them manually on that screen.
+Install the app (see "Get the app" below). On first launch you'll see the **Connect** screen — **scan the QR code in your terminal with the phone camera**, and the app fills in the server address and token and connects. If scanning doesn't work, paste them manually on that screen.
 
 ---
 
-## Building the app
+## Get the app (Android)
 
-For now you build from source (no prebuilt APK is published yet):
+**Easiest — download the APK:** grab the latest `claude-everywhere-*.apk` from the
+[**Releases**](https://github.com/lqzzy/claude-everywhere/releases) page and install it
+(allow "install from unknown sources" when prompted). minSdk 31 (Android 12+).
+
+**Or build from source** (for development):
 
 ```bash
 cd kotlin-app
@@ -93,7 +97,7 @@ cd kotlin-app
 ./gradlew installDebug
 ```
 
-Native Kotlin + Jetpack Compose, minSdk 31. No Node/Metro required.
+Native Kotlin + Jetpack Compose. No Node/Metro required.
 
 ---
 
