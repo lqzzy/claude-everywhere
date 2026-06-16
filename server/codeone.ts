@@ -7,7 +7,7 @@ ws.on("open", () => {
       t: "session.start",
       cwd: "/Users/qili/remote-claude",
       prompt:
-        '只用一个 TypeScript 代码块回复(不要任何额外文字):export async function login(u, p) 里 const r = await api("/login", { u, p }); if (!r.ok) throw new Error(r.msg); return r.token;',
+        'Reply with a single TypeScript code block only (no extra text): inside export async function login(u, p), const r = await api("/login", { u, p }); if (!r.ok) throw new Error(r.msg); return r.token;',
     })
   );
   console.log("started code session");

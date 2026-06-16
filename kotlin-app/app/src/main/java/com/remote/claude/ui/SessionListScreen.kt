@@ -52,10 +52,10 @@ import com.remote.claude.net.SessionSummary
 import com.remote.claude.ui.theme.C
 
 private fun zhStatus(s: String): String = when (s) {
-    "thinking" -> "思考中"
-    "tool" -> "运行中"
-    "waiting_permission" -> "等待批准"
-    else -> "空闲"
+    "thinking" -> "Thinking"
+    "tool" -> "Running"
+    "waiting_permission" -> "Awaiting approval"
+    else -> "Idle"
 }
 
 private fun needsAttention(s: String): Boolean =
@@ -65,8 +65,8 @@ private fun needsAttention(s: String): Boolean =
 fun SessionListScreen(vm: AppViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
-    var byLocation by remember { mutableStateOf(false) } // false=时间, true=位置
-    var pinned by remember { mutableStateOf(setOf<String>()) } // 本地置顶(尚未持久化)
+    var byLocation by remember { mutableStateOf(false) } // false=Time, true=Location
+    var pinned by remember { mutableStateOf(setOf<String>()) } // local pins (not yet persisted)
     var showNew by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
 
@@ -79,14 +79,14 @@ fun SessionListScreen(vm: AppViewModel) {
 
     BlobBackground {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            // 顶部标题行
+            // top title row
             Row(
                 Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("会话", color = C.ink, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                Text("Sessions", color = C.ink, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
                 Text(
-                    "⤓ 导入",
+                    "⤓ Import",
                     color = C.accent,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -98,10 +98,10 @@ fun SessionListScreen(vm: AppViewModel) {
                 Spacer(Modifier.width(8.dp))
                 Box(Modifier.size(8.dp).clip(CircleShape).background(if (state.connected) C.ok else C.err))
                 Spacer(Modifier.width(6.dp))
-                Text(if (state.connected) "已连接" else "连接中…", color = C.subtle, fontSize = 12.sp)
+                Text(if (state.connected) "Connected" else "Connecting…", color = C.subtle, fontSize = 12.sp)
             }
 
-            // 搜索 + 排序切换(玻璃药丸)
+            // search + sort toggle (glass pill)
             Glass(
                 Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(46.dp),
                 radius = 23.dp,
@@ -110,7 +110,7 @@ fun SessionListScreen(vm: AppViewModel) {
                     Text("⌕", color = C.dim, fontSize = 16.sp)
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.weight(1f)) {
-                        if (query.isEmpty()) Text("搜索标题 / 内容 / 路径…", color = C.dim, fontSize = 14.sp)
+                        if (query.isEmpty()) Text("Search title / text / path…", color = C.dim, fontSize = 14.sp)
                         BasicTextField(
                             value = query,
                             onValueChange = { query = it },
@@ -125,20 +125,20 @@ fun SessionListScreen(vm: AppViewModel) {
 
             Spacer(Modifier.height(6.dp))
 
-            // 列表主体
+            // list body
             LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                 if (!byLocation) {
                     val attn = all.filter { needsAttention(it.status) }
                     val recent = all.filter { !needsAttention(it.status) }
                         .sortedWith(compareByDescending<SessionSummary> { it.id in pinned }.thenByDescending { it.updatedAt })
                     if (attn.isNotEmpty()) {
-                        item { SectionHeader("需要你处理", C.accent, attn.size) }
+                        item { SectionHeader("Needs you", C.accent, attn.size) }
                         items(attn, key = { it.id }) { SessionRow(it, it.id in pinned, vm, { togglePin(pinned, it.id) { p -> pinned = p } }) }
                     }
-                    item { SectionHeader("最近", C.subtle, null) }
+                    item { SectionHeader("Recent", C.subtle, null) }
                     items(recent, key = { it.id }) { SessionRow(it, it.id in pinned, vm, { togglePin(pinned, it.id) { p -> pinned = p } }) }
                 } else {
-                    // 按位置(cwd)分组,组内按时间
+                    // group by location (cwd), sorted by time within each group
                     val groups = all.groupBy { it.cwd }.toList().sortedByDescending { (_, v) -> v.maxOf { it.updatedAt } }
                     groups.forEach { (cwd, list) ->
                         item(key = "grp_$cwd") { GroupHeader(cwd, list.size) }
@@ -147,19 +147,19 @@ fun SessionListScreen(vm: AppViewModel) {
                         }
                     }
                 }
-                if (all.isEmpty()) item { Text("还没有会话。点右下角新建。", color = C.dim, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(40.dp)) }
-                item { Spacer(Modifier.height(90.dp)) } // 给 FAB 留空间
+                if (all.isEmpty()) item { Text("No sessions yet. Tap + to create one.", color = C.dim, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(40.dp)) }
+                item { Spacer(Modifier.height(90.dp)) } // leave room for the FAB
             }
         }
 
-        // 右下角珊瑚渐变 FAB
+        // coral-gradient FAB in the bottom-right corner
         Box(
             Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp)
                 .clip(RoundedCornerShape(28.dp)).background(coralBrush())
                 .clickable { showNew = true }
                 .padding(start = 16.dp, end = 19.dp, top = 13.dp, bottom = 13.dp),
         ) {
-            Text("＋ 新建会话", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text("＋ New session", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 
@@ -181,19 +181,19 @@ private fun ImportDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭", color = C.accent) } },
-        dismissButton = { TextButton(onClick = onRefresh) { Text("刷新", color = C.dim) } },
-        title = { Text("导入历史会话", color = C.ink) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close", color = C.accent) } },
+        dismissButton = { TextButton(onClick = onRefresh) { Text("Refresh", color = C.dim) } },
+        title = { Text("Import a session", color = C.ink) },
         text = {
             if (items.isEmpty()) {
-                Text("没有可导入的会话(或正在加载…点刷新)", color = C.dim, fontSize = 13.sp)
+                Text("Nothing to import (or still loading — tap refresh)", color = C.dim, fontSize = 13.sp)
             } else {
                 LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(items, key = { it.claudeSessionId }) { it ->
                         Column(
                             Modifier.fillMaxWidth().clickable { onPick(it) }.padding(vertical = 9.dp),
                         ) {
-                            Text(it.title.ifBlank { "(无标题)" }, color = C.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(it.title.ifBlank { "(untitled)" }, color = C.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
                                 "${it.cwd} · ${relativeTime(it.updatedAt)}",
                                 color = C.dim, fontSize = 11.sp, fontFamily = FontFamily.Monospace,
@@ -219,8 +219,8 @@ private fun SortToggle(byLocation: Boolean, onChange: (Boolean) -> Unit) {
         Modifier.clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.5f)).padding(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SegItem("时间", !byLocation) { onChange(false) }
-        SegItem("位置", byLocation) { onChange(true) }
+        SegItem("Time", !byLocation) { onChange(false) }
+        SegItem("Location", byLocation) { onChange(true) }
     }
 }
 
@@ -274,22 +274,22 @@ private fun SessionRow(s: SessionSummary, isPinned: Boolean, vm: AppViewModel, o
     val dismiss = rememberSwipeToDismissBoxState(
         confirmValueChange = { v ->
             when (v) {
-                SwipeToDismissBoxValue.StartToEnd -> vm.archive(s.id) // 右滑归档
-                SwipeToDismissBoxValue.EndToStart -> vm.delete(s.id)  // 左滑删除
+                SwipeToDismissBoxValue.StartToEnd -> vm.archive(s.id) // swipe right to archive
+                SwipeToDismissBoxValue.EndToStart -> vm.delete(s.id)  // swipe left to delete
                 else -> {}
             }
-            false // 实际移除由 state 更新驱动,这里不让组件自行 dismiss
+            false // actual removal is driven by state updates; don't let the component dismiss itself
         },
     )
     SwipeToDismissBox(
         state = dismiss,
         backgroundContent = {
-            // 只在真正滑动时画归档/删除底色;静止(Settled)时透明,否则金色会透过半透明玻璃卡
+            // only draw the archive/delete background while actively swiping; transparent when Settled, otherwise the gold shows through the translucent glass card
             val dir = dismiss.dismissDirection
             if (dir != SwipeToDismissBoxValue.Settled) {
                 val toEnd = dir == SwipeToDismissBoxValue.EndToStart
                 val color = if (toEnd) C.err else C.warn
-                val label = if (toEnd) "删除" else "归档"
+                val label = if (toEnd) "Delete" else "Archive"
                 Box(
                     Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 6.dp).clip(RoundedCornerShape(20.dp)).background(color),
                     contentAlignment = if (toEnd) Alignment.CenterEnd else Alignment.CenterStart,
@@ -323,7 +323,7 @@ private fun SessionCard(s: SessionSummary, isPinned: Boolean, onClick: () -> Uni
                 }
                 Text(s.cwd, color = C.subtle, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
                 if (s.preview.isNotBlank()) {
-                    val prefix = if (s.previewRole == "user") "我: " else "Claude: "
+                    val prefix = if (s.previewRole == "user") "Me: " else "Claude: "
                     Text(prefix + s.preview, color = C.subtle, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 5.dp), lineHeight = 18.sp)
                 }
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -353,13 +353,13 @@ private fun NewSessionDialog(onDismiss: () -> Unit, onStart: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onStart(text.trim()) }) { Text("开始", color = C.accent) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = C.dim) } },
-        title = { Text("新建会话", color = C.ink) },
+        confirmButton = { TextButton(onClick = { if (text.isNotBlank()) onStart(text.trim()) }) { Text("Start", color = C.accent) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = C.dim) } },
+        title = { Text("New session", color = C.ink) },
         text = {
             Glass(Modifier.fillMaxWidth().height(110.dp), radius = 14.dp) {
                 Box(Modifier.fillMaxSize().padding(12.dp)) {
-                    if (text.isEmpty()) Text("输入第一句话…", color = C.dim, fontSize = 14.sp)
+                    if (text.isEmpty()) Text("Type your first message…", color = C.dim, fontSize = 14.sp)
                     BasicTextField(value = text, onValueChange = { text = it }, textStyle = TextStyle(color = C.ink, fontSize = 14.sp), modifier = Modifier.fillMaxSize())
                 }
             }

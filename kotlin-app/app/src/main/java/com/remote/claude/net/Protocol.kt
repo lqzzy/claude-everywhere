@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
 
-// 与 server/src/protocol.ts 一一对应的线协议。
-// ServerEvent / ClientCommand 用 sealed class + @JsonClassDiscriminator("t") 实现 {"t":"..."} 多态。
+// Wire protocol that maps one-to-one with server/src/protocol.ts.
+// ServerEvent / ClientCommand use a sealed class + @JsonClassDiscriminator("t") to implement {"t":"..."} polymorphism.
 
 @Serializable
 data class UsageInfo(
@@ -86,7 +86,7 @@ data class TurnInfo(
     val outputTokens: Int = 0,
 )
 
-// ---- 服务端 → App ----
+// ---- Server → App ----
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("t")
@@ -145,7 +145,7 @@ sealed class ServerEvent {
     data class Error(val message: String) : ServerEvent()
 }
 
-// ---- App → 服务端 ----
+// ---- App → Server ----
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("t")

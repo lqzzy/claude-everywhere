@@ -1,4 +1,4 @@
-// 冒烟测试:连服务 → 起一个会话 → 观察流式/活动/token/完成事件,验证整条数据流。
+// Smoke test: connect to the server → start a session → observe streaming/activity/token/completion events to verify the whole data flow.
 import "dotenv/config";
 import { WebSocket } from "ws";
 
@@ -11,21 +11,21 @@ let started = false;
 let lastStatus = "";
 let streamed = 0;
 
-ws.on("open", () => console.log("[smoke] 已连接", url));
-ws.on("error", (e) => console.error("[smoke] ws 错误", e));
+ws.on("open", () => console.log("[smoke] connected", url));
+ws.on("error", (e) => console.error("[smoke] ws error", e));
 
 ws.on("message", (data) => {
   const e = JSON.parse(data.toString());
   switch (e.t) {
     case "session.list":
-      console.log(`[smoke] session.list: ${e.sessions.length} 个会话`);
+      console.log(`[smoke] session.list: ${e.sessions.length} sessions`);
       if (!started) {
         started = true;
-        console.log("[smoke] 发起一个测试会话…");
+        console.log("[smoke] Starting a test session…");
         ws.send(
           JSON.stringify({
             t: "session.start",
-            prompt: "请用中文写一段大约 400 字、关于沙漠日落的细腻描写,分三段。直接开始写,不要使用任何工具。",
+            prompt: "Write a roughly 400-word, vivid description of a desert sunset, in three paragraphs. Start writing directly, don't use any tools.",
           })
         );
       }
@@ -40,15 +40,15 @@ ws.on("message", (data) => {
       console.log(`\n[smoke] message.complete role=${e.message.role} blocks=${e.message.blocks.length}`);
       break;
     case "activity":
-      console.log(`[smoke] activity: ${e.tool ?? "(空)"}`);
+      console.log(`[smoke] activity: ${e.tool ?? "(none)"}`);
       break;
     case "usage":
-      console.log(`[smoke] usage(累计): ${JSON.stringify(e.usage)}`);
+      console.log(`[smoke] usage (cumulative): ${JSON.stringify(e.usage)}`);
       break;
     case "turn": {
       const el = ((Date.now() - e.turn.sentAt) / 1000).toFixed(1);
       console.log(
-        `[smoke] ⏱ turn ${e.turn.phase} | 耗时 ${el}s | 本轮 in=${e.turn.inputTokens} out=${e.turn.outputTokens}`
+        `[smoke] ⏱ turn ${e.turn.phase} | elapsed ${el}s | this turn in=${e.turn.inputTokens} out=${e.turn.outputTokens}`
       );
       break;
     }
@@ -59,17 +59,17 @@ ws.on("message", (data) => {
       }
       break;
     case "permission.request":
-      console.log(`[smoke] 收到权限请求 tool=${e.tool} → 自动批准`);
+      console.log(`[smoke] Got permission request tool=${e.tool} → auto-approving`);
       ws.send(JSON.stringify({ t: "permission.respond", requestId: e.requestId, allow: true }));
       break;
     case "error":
-      console.error("[smoke] 错误:", e.message);
+      console.error("[smoke] error:", e.message);
       break;
   }
 });
 
 setTimeout(() => {
-  console.log(`\n[smoke] ===== 完成。流式收到 ${streamed} 个字符 =====`);
+  console.log(`\n[smoke] ===== Done. Received ${streamed} streamed chars =====`);
   ws.close();
   process.exit(0);
 }, 60000);

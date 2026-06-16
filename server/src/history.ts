@@ -1,6 +1,6 @@
-// 按需读取单个 claude 会话 transcript:~/.claude/projects/<编码cwd>/<sessionId>.jsonl。
-// 手机打开某会话时调用,拿到电脑端 `claude --resume` 后的最新全量消息。
-// 全程对 IO 兜底,任何失败都返回 [],绝不抛异常。
+// Read a single claude session transcript on demand: ~/.claude/projects/<encoded-cwd>/<sessionId>.jsonl.
+// Called when the phone opens a session, to fetch the latest full set of messages after the desktop's `claude --resume`.
+// IO is guarded throughout — any failure returns [], never throws.
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -8,8 +8,8 @@ import type { ContentBlock, Message } from "./protocol";
 
 const ROOT = join(homedir(), ".claude", "projects");
 
-// transcript 里一行 message.content 的块 → 我们的 ContentBlock
-// (从 transcriptMirror.ts 原样复制,该文件即将删除,故不 import)
+// A block from one line's message.content in the transcript → our ContentBlock
+// (copied verbatim from transcriptMirror.ts, which is about to be deleted, so it's not imported)
 function mapBlock(b: any): ContentBlock | null {
   if (typeof b === "string") return { type: "text", text: b };
   switch (b?.type) {
@@ -25,7 +25,7 @@ function mapBlock(b: any): ContentBlock | null {
   }
 }
 
-// jsonl 一行对象 → Message(从 transcriptMirror.ts 原样复制)
+// One jsonl line object → Message (copied verbatim from transcriptMirror.ts)
 function lineToMessage(o: any): Message | null {
   if ((o?.type !== "user" && o?.type !== "assistant") || !o.message) return null;
   const c = o.message.content;
@@ -44,15 +44,15 @@ function lineToMessage(o: any): Message | null {
   };
 }
 
-// 定位会话文件:首选按 cwd 编码拼路径;不存在则遍历所有项目目录兜底找同名 jsonl。
-// 导出供 server.ts 的 fs.watch 实时监听用。
+// Locate the session file: first try the path built from the encoded cwd; if it doesn't exist, fall back to scanning every project directory for a jsonl of the same name.
+// Exported for use by server.ts's fs.watch live monitoring.
 export function locateFile(claudeSessionId: string, cwd: string): string | null {
   const fileName = claudeSessionId + ".jsonl";
   try {
     const preferred = join(ROOT, cwd.replace(/\//g, "-"), fileName);
     if (existsSync(preferred)) return preferred;
   } catch {}
-  // 兜底:遍历 ~/.claude/projects/ 下所有子目录,找同名文件
+  // Fallback: scan every subdirectory under ~/.claude/projects/ for a file of the same name
   try {
     if (!existsSync(ROOT)) return null;
     const entries = readdirSync(ROOT, { withFileTypes: true });
@@ -68,7 +68,7 @@ export function locateFile(claudeSessionId: string, cwd: string): string | null 
   return null;
 }
 
-// 系统机器消息(命令包装 / caveat / system-reminder / 续接摘要前言等),不是真实对话,渲染时过滤。
+// System/machine messages (command wrappers / caveats / system-reminders / continuation-summary preambles, etc.) — not real conversation, filtered out during rendering.
 const NOISE_PREFIXES = [
   "<local-command-caveat>",
   "<command-name>",
@@ -89,11 +89,11 @@ function isNoiseText(t: string): boolean {
   return NOISE_PREFIXES.some((p) => s.startsWith(p));
 }
 
-// 从一行已解析的 jsonl 对象,累计"当前上下文 / 历史峰值"。
-//   当前上下文 current = 最近一次 assistant 回合的 input+cache 总量;
-//                        或最近一次 /compact 的 postTokens(谁在文件里更靠后取谁)。
-//   → 这才是真相:/compact 后会回落到 postTokens,后续回合再据实增长。
-//   峰值 peak 用于推断窗口大小(见 contextLimitFromPeak)。
+// From one parsed jsonl object, accumulate "current context / historical peak".
+//   current context `current` = the input+cache total of the most recent assistant turn;
+//                        or the postTokens of the most recent /compact (whichever appears later in the file wins).
+//   → This is the truth: after /compact it drops back to postTokens, then grows again per actual usage in subsequent turns.
+//   the peak `peak` is used to infer the window size (see contextLimitFromPeak).
 export function accumContext(o: any, acc: { current: number; peak: number }): void {
   if (o?.type === "system" && o.subtype === "compact_boundary") {
     const pm = o.compactMetadata;
@@ -109,21 +109,22 @@ export function accumContext(o: any, acc: { current: number; peak: number }): vo
   }
 }
 
-// 由历史峰值推断上下文窗口:曾占用 >200k ⇒ 必是 1M 窗口(Claude 会在溢出前自动压缩,
-// 且没有 500k 档),否则按默认 200k。窗口真值在 transcript 里没有结构化字段,只能这样推断;
-// app 端真正跑一轮时 handleResult 会用 modelUsage.contextWindow 精确校正。
+// Infer the context window from the historical peak: if it ever exceeded 200k ⇒ it must be a 1M window (Claude
+// auto-compacts before overflow, and there's no 500k tier), otherwise default to 200k. The true window size has no
+// structured field in the transcript, so this is the only way to infer it; when the app actually runs a turn,
+// handleResult corrects it precisely using modelUsage.contextWindow.
 export function contextLimitFromPeak(peak: number): number {
   return peak > 200000 ? 1000000 : 200000;
 }
 
 export interface HistoryResult {
   messages: Message[];
-  contextTokens: number; // 当前真实上下文占用(读自磁盘,含 /compact 后回落 + 终端续聊)
-  contextLimit: number; //  推断的上下文窗口(0=未找到 transcript,调用方应跳过更新)
+  contextTokens: number; // current real context usage (read from disk, including the post-/compact drop + terminal continuations)
+  contextLimit: number; //  inferred context window (0 = transcript not found, the caller should skip the update)
 }
 
-// 读取某会话的最新全量消息 + 当前上下文占用。文件找不到/读失败一律返回空结果(contextLimit=0)。
-// 处理 /compact:压缩边界 → 合成"系统分隔"消息;续接摘要/命令包装等机器消息 → 过滤。
+// Read a session's latest full set of messages + current context usage. If the file is missing or the read fails, always return an empty result (contextLimit=0).
+// Handles /compact: a compaction boundary → synthesize a "system divider" message; continuation summaries / command wrappers and other machine messages → filtered out.
 export function readHistory(claudeSessionId: string, cwd: string): HistoryResult {
   const empty: HistoryResult = { messages: [], contextTokens: 0, contextLimit: 0 };
   try {
@@ -135,29 +136,29 @@ export function readHistory(claudeSessionId: string, cwd: string): HistoryResult
     for (const ln of raw.split("\n")) {
       if (!ln.trim()) continue;
       let o: any;
-      try { o = JSON.parse(ln); } catch { continue; } // 坏行跳过
+      try { o = JSON.parse(ln); } catch { continue; } // skip bad lines
 
-      accumContext(o, acc); // 顺带累计上下文占用(同一遍扫描,零额外 IO)
+      accumContext(o, acc); // also accumulate context usage along the way (same pass, zero extra IO)
 
-      // /compact 边界 → 一条居中分隔提示
+      // /compact boundary → one centered divider notice
       if (o.type === "system" && o.subtype === "compact_boundary") {
         messages.push({
           id: o.uuid || `compact-${messages.length}`,
           role: "system",
-          blocks: [{ type: "text", text: "上下文已压缩 · 早前对话已自动总结" }],
+          blocks: [{ type: "text", text: "Context compacted · earlier conversation auto-summarized" }],
           ts: o.timestamp ? Date.parse(o.timestamp) : Date.now(),
         });
         continue;
       }
-      // 巨大的"续接摘要"是机器生成的,不展示
+      // The huge "continuation summary" is machine-generated, don't display it
       if (o.isCompactSummary) continue;
 
       const m = lineToMessage(o);
       if (!m) continue;
-      // 单一文本块且内容是命令包装/caveat/system-reminder 等 → 过滤
+      // A single text block whose content is a command wrapper/caveat/system-reminder, etc. → filter out
       const firstText = m.blocks.find((b) => b.type === "text")?.text ?? "";
       if (m.blocks.length === 1 && m.blocks[0].type === "text" && isNoiseText(firstText)) continue;
-      // 压缩后机器应答的占位
+      // The placeholder for a machine reply after compaction
       if (m.role === "assistant" && m.blocks.length === 1 && firstText.trim() === "No response requested.") continue;
 
       messages.push(m);

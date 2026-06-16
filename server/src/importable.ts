@@ -1,4 +1,4 @@
-// 列出磁盘上可导入的历史会话 + 从 transcript 构建完整 SessionSummary(供导入进 store)。
+// List importable past sessions on disk + build a full SessionSummary from a transcript (for importing into the store).
 import { readFileSync, readdirSync, existsSync, statSync, openSync, readSync, closeSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -8,7 +8,7 @@ import { accumContext, contextLimitFromPeak } from "./history";
 const ROOT = join(homedir(), ".claude", "projects");
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// 读文件前 N 字节(避免为了首条标题把整份大 transcript 读进内存)
+// Read the first N bytes of a file (avoids loading an entire large transcript into memory just for the first-message title)
 function readHead(file: string, bytes = 65536): string {
   try {
     const fd = openSync(file, "r");
@@ -21,7 +21,7 @@ function readHead(file: string, bytes = 65536): string {
   }
 }
 
-// /goal 的 Stop-hook 首条会包一层,抽出引号里的真实目标作标题
+// The /goal Stop-hook wraps the first message; extract the real goal inside the quotes to use as the title
 function titleFrom(text: string): string {
   let t = text;
   const m = text.match(/condition:\s*"([^"]+)"/);
@@ -53,7 +53,7 @@ function dirToCwd(dir: string): string {
   return dir.replace(/^-/, "/").replace(/-/g, "/");
 }
 
-// 扫 ~/.claude/projects,列出 UUID 命名(排除 agent-*/journal)、未在列表中的会话,按最近活跃排序。
+// Scan ~/.claude/projects and list UUID-named sessions (excluding agent-*/journal) that aren't already in the list, sorted by most recently active.
 export function listImportable(excludeIds: Set<string>): ImportableItem[] {
   if (!existsSync(ROOT)) return [];
   const out: ImportableItem[] = [];
@@ -65,13 +65,13 @@ export function listImportable(excludeIds: Set<string>): ImportableItem[] {
     for (const fn of files) {
       if (!fn.endsWith(".jsonl")) continue;
       const id = fn.slice(0, -6);
-      if (!UUID_RE.test(id)) continue; // 跳过 agent-*/journal 等非顶层会话
-      if (excludeIds.has(id)) continue; // 已在列表里的不重复
+      if (!UUID_RE.test(id)) continue; // skip non-top-level sessions like agent-*/journal
+      if (excludeIds.has(id)) continue; // skip duplicates that are already in the list
       const file = join(ROOT, d, fn);
       let mtime = 0;
       try { mtime = Math.floor(statSync(file).mtimeMs); } catch { continue; }
       const { cwd, title } = parseHead(readHead(file));
-      if (!title) continue; // 无可读首条的跳过
+      if (!title) continue; // skip sessions without a readable first message
       out.push({ claudeSessionId: id, cwd: cwd || dirToCwd(d), title, updatedAt: mtime });
     }
   }
@@ -92,7 +92,7 @@ function locate(id: string, cwdHint?: string): string | null {
   return null;
 }
 
-// 从完整 transcript 构建一条 SessionSummary(真正导入用)。
+// Build a single SessionSummary from a full transcript (used for the actual import).
 export function buildSummary(claudeSessionId: string, cwdHint?: string): SessionSummary | null {
   const file = locate(claudeSessionId, cwdHint);
   if (!file) return null;
@@ -103,7 +103,7 @@ export function buildSummary(claudeSessionId: string, cwdHint?: string): Session
   let lastRole: "user" | "assistant" = "assistant";
   let lastTs = 0;
   const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, costUsd: 0 };
-  const acc = { current: 0, peak: 0 }; // 真实"当前上下文"(含 /compact 回落),而非历次 input 累加
+  const acc = { current: 0, peak: 0 }; // the true "current context" (accounting for /compact drops), not a running sum of every input
   let raw = "";
   try { raw = readFileSync(file, "utf8"); } catch { return null; }
   for (const ln of raw.split("\n")) {
@@ -138,7 +138,7 @@ export function buildSummary(claudeSessionId: string, cwdHint?: string): Session
     id: claudeSessionId,
     claudeSessionId,
     source: "app",
-    title: titleFrom(firstUser) || "(导入会话)",
+    title: titleFrom(firstUser) || "(imported session)",
     cwd: cwd || "/Users/qili",
     model,
     status: "idle",

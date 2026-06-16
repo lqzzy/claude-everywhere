@@ -70,7 +70,7 @@ If your phone shows up here, you're ready. (Keep Tailscale enabled on the phone 
 ### 1. On your computer
 
 ```bash
-git clone <this-repo> claude-everywhere
+git clone https://github.com/lqzzy/claude-everywhere
 cd claude-everywhere
 ./install.sh
 ```

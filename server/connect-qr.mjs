@@ -1,11 +1,11 @@
-// 打印"手机一键连接"二维码:把 server 地址 + token 编码成 claudeeverywhere://connect deep link。
-// 手机用系统相机扫一下 → 唤起 Claude Everywhere App → 自动填好地址和令牌并连接。
-// 用法: node connect-qr.mjs <ws-url> <token>
+// Print a "one-tap phone connect" QR code: encode the server address + token into a claudeeverywhere://connect deep link.
+// Scan it with the phone's system camera → launches the Claude Everywhere app → auto-fills the address and token and connects.
+// Usage: node connect-qr.mjs <ws-url> <token>
 import qrcode from "qrcode-terminal";
 
 const [, , url, token] = process.argv;
 if (!url || !token) {
-  console.error("用法: node connect-qr.mjs <ws-url> <token>");
+  console.error("Usage: node connect-qr.mjs <ws-url> <token>");
   process.exit(1);
 }
 
@@ -13,7 +13,7 @@ const deeplink =
   `claudeeverywhere://connect?url=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`;
 
 qrcode.generate(deeplink, { small: true });
-console.log("  扫不出来?在 App「手动连接」里填:");
-console.log("    地址: " + url);
-console.log("    令牌: " + token);
+console.log("  Can't scan it? Enter manually in the app's \"Manual connect\" screen:");
+console.log("    address: " + url);
+console.log("    token: " + token);
 console.log("  (deep link: " + deeplink + ")\n");

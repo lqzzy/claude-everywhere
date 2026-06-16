@@ -23,12 +23,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge() // 全屏沉浸 + 窗口不为键盘 resize,IME 由 Compose 的 imePadding 统一处理(避免双重计算)
-        handleDeepLink(intent) // 冷启动:若由扫码 deep link 唤起,直接配置并连接
+        enableEdgeToEdge() // full-screen immersive + don't resize the window for the keyboard; the IME is handled uniformly by Compose's imePadding (avoids double-counting)
+        handleDeepLink(intent) // cold start: if launched by a scanned deep link, configure and connect directly
         setContent {
             ClaudeRemoteTheme {
                 val state by vm.state.collectAsStateWithLifecycle()
-                // App 回到前台(ON_START)时刷新当前会话,拉取后台期间产生的新消息(电脑续聊 / 后台轮次)
+                // When the app returns to the foreground (ON_START), refresh the current session to pull new messages produced while backgrounded (desktop continuing the chat / background turns)
                 val lifecycleOwner = LocalLifecycleOwner.current
                 DisposableEffect(lifecycleOwner) {
                     val obs = LifecycleEventObserver { _, event ->
@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
                     lifecycleOwner.lifecycle.addObserver(obs)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
                 }
-                // 在对话页时,系统返回键回到列表
+                // On the conversation screen, the system back button returns to the list
                 BackHandler(enabled = state.current != null) { vm.back() }
                 when {
                     state.needsSetup -> ConnectScreen(vm)
@@ -48,14 +48,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // App 已开着时再扫码,会走这里
+    // Scanning a QR code while the app is already running comes through here
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleDeepLink(intent)
     }
 
-    // 解析 claudeeverywhere://connect?url=...&token=...,自动配置并连接
+    // Parse claudeeverywhere://connect?url=...&token=... and configure + connect automatically
     private fun handleDeepLink(intent: Intent?) {
         val data = intent?.data ?: return
         if (data.scheme != "claudeeverywhere") return

@@ -64,37 +64,37 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 // ============================================================================
-// 对话屏(单个会话聊天界面)。照 design/d8.html 还原。
-// 只依赖基础层符号:Glass / BlobBackground / coralBrush / C / kfmt / AppViewModel ...
-// 无 material-icons,所有图标用 Unicode 字形。
+// Conversation screen (single-session chat view). Recreated from design/d8.html.
+// Depends only on base-layer symbols: Glass / BlobBackground / coralBrush / C / kfmt / AppViewModel ...
+// No material-icons; all icons use Unicode glyphs.
 // ============================================================================
 
-// 中文状态文案(对应 session.status)
+// Status labels (mapped from session.status)
 private fun statusText(status: String): String = when (status) {
-    "idle" -> "空闲"
-    "thinking" -> "思考中"
-    "tool" -> "执行工具"
-    "waiting_permission" -> "等待批准"
-    "ended" -> "已结束"
+    "idle" -> "Idle"
+    "thinking" -> "Thinking"
+    "tool" -> "Running tool"
+    "waiting_permission" -> "Awaiting approval"
+    "ended" -> "Ended"
     else -> status
 }
 
-// ---- JsonElement 取字段 / 转纯文本的小工具 ----
+// ---- Small helpers for reading fields from / flattening JsonElement to text ----
 
-// 从 JsonObject 取某 key 的字符串值
+// Get the string value of a key from a JsonObject
 private fun JsonElement?.str(key: String): String? =
     (this as? JsonObject)?.get(key)?.jsonPrimitive?.contentOrNull
 
-// 文件路径取末段(file_path -> 文件名)
+// Take the last path segment (file_path -> file name)
 private fun baseName(p: String?): String =
     if (p.isNullOrEmpty()) "" else p.substringAfterLast('/').ifEmpty { p }
 
-// 压成单行(命令摘要用)
+// Collapse to a single line (for command summaries)
 private fun oneLine(s: String?): String =
     s?.replace(Regex("\\s+"), " ")?.trim() ?: ""
 
-// 把 tool_result 的 content(JsonElement)转成可读文本。
-// 兼容三种形态:纯字符串 / [{type:"text",text:"..."}] 数组 / 其它对象(toString 兜底)。
+// Convert a tool_result's content (JsonElement) into readable text.
+// Handles three shapes: plain string / [{type:"text",text:"..."}] array / other objects (toString fallback).
 private fun contentToText(el: JsonElement?): String {
     if (el == null) return ""
     return when (el) {
@@ -110,11 +110,11 @@ private fun contentToText(el: JsonElement?): String {
     }
 }
 
-// 截断超长输出,避免一屏被工具结果撑爆
+// Truncate overly long output so tool results don't blow up a full screen
 private fun trunc(s: String, n: Int = 3000): String =
-    if (s.length > n) s.take(n) + "\n…(还有 ${s.length - n} 字)" else s
+    if (s.length > n) s.take(n) + "\n…(${s.length - n} more chars)" else s
 
-// 工具头部:图标字形 + 摘要标签(照 d8 + 旧 ToolBlock)
+// Tool header: icon glyph + summary label (per d8 + old ToolBlock)
 private data class ToolHead(val icon: String, val label: String)
 
 private fun toolHead(name: String?, input: JsonElement?): ToolHead = when (name) {
@@ -124,10 +124,10 @@ private fun toolHead(name: String?, input: JsonElement?): ToolHead = when (name)
     "Read" -> ToolHead("⎙", baseName(input.str("file_path")).ifEmpty { "Read" })
     "Grep" -> ToolHead("⌕", (input.str("pattern") ?: "Grep"))
     "Glob" -> ToolHead("⌕", (input.str("pattern") ?: "Glob"))
-    "TodoWrite" -> ToolHead("☑", "更新待办")
+    "TodoWrite" -> ToolHead("☑", "Update todos")
     "WebFetch" -> ToolHead("⊕", (input.str("url") ?: "WebFetch"))
-    "Task" -> ToolHead("✦", oneLine(input.str("description")).ifEmpty { "子任务" })
-    else -> ToolHead("⚙", name ?: "工具")
+    "Task" -> ToolHead("✦", oneLine(input.str("description")).ifEmpty { "Subtask" })
+    else -> ToolHead("⚙", name ?: "Tool")
 }
 
 private val mono = FontFamily.Monospace
@@ -143,8 +143,8 @@ fun ConversationScreen(vm: AppViewModel) {
     val streaming = state.streaming[id]
     val turn = state.turns[id]
 
-    // tool_result 匹配:扫描所有消息,建 toolUseId -> tool_result 块 的索引。
-    // tool_result 通常作为独立 user 消息出现,渲染 tool_use 时折进去,不单独显示成气泡。
+    // tool_result matching: scan all messages, build a toolUseId -> tool_result block index.
+    // tool_result usually appears as a standalone user message; it's folded into the tool_use render rather than shown as its own bubble.
     val resultMap: Map<String, ContentBlock> = remember(messages) {
         buildMap {
             messages.forEach { m ->
@@ -161,7 +161,7 @@ fun ConversationScreen(vm: AppViewModel) {
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // ---------- 1. 顶部 nav 药丸 ----------
+            // ---------- 1. Top nav pill ----------
             Glass(
                 modifier = Modifier
                     .padding(horizontal = 14.dp)
@@ -175,7 +175,7 @@ fun ConversationScreen(vm: AppViewModel) {
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // 返回(珊瑚色)
+                    // Back (coral)
                     Text(
                         "‹",
                         color = C.accent,
@@ -188,7 +188,7 @@ fun ConversationScreen(vm: AppViewModel) {
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            session?.title?.ifEmpty { "会话" } ?: "会话",
+                            session?.title?.ifEmpty { "Session" } ?: "Session",
                             color = C.ink,
                             fontSize = 15.5f.sp,
                             fontWeight = FontWeight.Bold,
@@ -201,7 +201,7 @@ fun ConversationScreen(vm: AppViewModel) {
                             maxLines = 1,
                         )
                     }
-                    // 珊瑚渐变 orb
+                    // Coral gradient orb
                     Box(
                         Modifier
                             .size(30.dp)
@@ -211,10 +211,10 @@ fun ConversationScreen(vm: AppViewModel) {
                 }
             }
 
-            // ---------- 2. 用量面板:Context / 5h 额度 / 7d 额度(进度条 + % + 距重置)----------
+            // ---------- 2. Usage panel: Context / 5h usage / 7d usage (progress bar + % + until reset) ----------
             val ctxPct = if (session != null && session.contextLimit > 0)
                 (session.contextTokens * 100 / session.contextLimit).coerceIn(0, 100) else 0
-            // 进入会话后定时刷新订阅额度(每 60s)
+            // After entering the session, periodically refresh subscription usage (every 60s)
             LaunchedEffect(id) {
                 while (true) {
                     vm.requestUsage()
@@ -229,15 +229,15 @@ fun ConversationScreen(vm: AppViewModel) {
                     StatBar("Context", ctxPct, null)
                     val q = state.quota
                     if (q != null) {
-                        StatBar("5h 额度", q.fiveHour.utilization, untilReset(q.fiveHour.resetsAt))
-                        StatBar("7d 额度", q.sevenDay.utilization, untilReset(q.sevenDay.resetsAt))
+                        StatBar("5h usage", q.fiveHour.utilization, untilReset(q.fiveHour.resetsAt))
+                        StatBar("7d usage", q.sevenDay.utilization, untilReset(q.sevenDay.resetsAt))
                     } else {
-                        Text("额度加载中…", color = C.dim, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text("Loading usage…", color = C.dim, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }
 
-            // ---------- 3. resume 提示(终端续聊) ----------
+            // ---------- 3. Resume hint (resume in terminal) ----------
             val claudeSid = session?.claudeSessionId
             if (!claudeSid.isNullOrEmpty()) {
                 val clipboard = LocalClipboardManager.current
@@ -251,7 +251,7 @@ fun ConversationScreen(vm: AppViewModel) {
                         },
                 ) {
                     Text(
-                        "终端续聊: claude --resume $short…  ⧉",
+                        "Resume in terminal: claude --resume $short…  ⧉",
                         color = C.accent,
                         fontSize = 11.5f.sp,
                         fontFamily = mono,
@@ -259,9 +259,9 @@ fun ConversationScreen(vm: AppViewModel) {
                 }
             }
 
-            // ---------- 4. 消息流(reverseLayout:index0=最新在底部;向上滚=更早;翻页加在高索引端,不跳位)----------
+            // ---------- 4. Message feed (reverseLayout: index 0 = newest at bottom; scroll up = older; pagination appends at the high-index end, no jump) ----------
             val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-            // 最新在前(配合 reverseLayout):流式卡 → 最新消息 → … → 最早消息
+            // Newest first (to match reverseLayout): streaming card → newest message → … → oldest message
             val feedItems = remember(messages, streaming) {
                 buildList {
                     if (streaming != null && streaming.text.isNotEmpty()) {
@@ -273,11 +273,11 @@ fun ConversationScreen(vm: AppViewModel) {
                     }
                 }
             }
-            // 有新内容(最新条目变化 / 流式正文增长)时滚到底部(index 0);向上翻历史不会触发
+            // On new content (newest item changes / streaming body grows), scroll to the bottom (index 0); scrolling up through history won't trigger it
             LaunchedEffect(feedItems.firstOrNull()?.key, streaming?.text) {
                 if (feedItems.isNotEmpty()) listState.animateScrollToItem(0)
             }
-            // 滚到已加载的最顶(reverseLayout 下=最大索引)且还有更早 → 加载上一页
+            // Reached the top of what's loaded (= max index under reverseLayout) and there's older content → load the previous page
             val canLoadOlder = (state.historyFrom[id] ?: 0) > 0
             LaunchedEffect(listState, canLoadOlder, feedItems.size) {
                 snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
@@ -307,7 +307,7 @@ fun ConversationScreen(vm: AppViewModel) {
                 }
             }
 
-            // ---------- 6. live 心跳行 ----------
+            // ---------- 6. Live heartbeat row ----------
             if (turn != null && turn.phase != "done") {
                 LiveBeat(
                     phase = turn.phase,
@@ -326,7 +326,7 @@ fun ConversationScreen(vm: AppViewModel) {
     }
 }
 
-// 渲染条目的密封类型(消息 / 流式)
+// Sealed type for feed items (message / streaming)
 private sealed interface FeedItem {
     val key: String
     data class Msg(val m: Message) : FeedItem {
@@ -337,13 +337,13 @@ private sealed interface FeedItem {
     }
 }
 
-// 该消息是否有可见内容(过滤掉纯 tool_result 的 user 消息、空文本等)
+// Whether the message has visible content (filters out user messages that are pure tool_result, empty text, etc.)
 private fun shouldRender(m: Message): Boolean {
     if (m.role == "user") {
-        // 只要有非空文本块就显示;纯 tool_result 不显示成气泡
+        // Show as long as there's a non-empty text block; pure tool_result isn't rendered as a bubble
         return m.blocks.any { it.type == "text" && !it.text.isNullOrBlank() }
     }
-    // assistant:有 tool_use 或非空 text/thinking
+    // assistant: has tool_use or non-empty text/thinking
     return m.blocks.any { b ->
         b.type == "tool_use" ||
             ((b.type == "text" || b.type == "thinking") && !b.text.isNullOrBlank())
@@ -361,7 +361,7 @@ private fun Chip(content: @Composable () -> Unit) {
     }
 }
 
-// 普通文字 + 加粗段拼成一行
+// Compose plain text + a bold segment into one line
 @Composable
 private fun ChipLine(prefix: String, bold: String, suffix: String = "") {
     Text(
@@ -375,7 +375,7 @@ private fun ChipLine(prefix: String, bold: String, suffix: String = "") {
     )
 }
 
-// 一条用量进度条:标签 | 进度条 | 百分比 | (距重置)。颜色随利用率升高:珊瑚→金→红。
+// A single usage progress bar: label | bar | percent | (until reset). Color shifts as utilization rises: coral → gold → red.
 @Composable
 private fun StatBar(label: String, pct: Int, sub: String?) {
     val color = when {
@@ -416,7 +416,7 @@ private fun StatBar(label: String, pct: Int, sub: String?) {
     }
 }
 
-// 系统分隔条(如 /compact 的"上下文已压缩"):居中细线 + 文字,不当成对话气泡。
+// System divider (e.g. /compact's "Context compacted"): centered thin line + text, not treated as a chat bubble.
 @Composable
 private fun SystemDivider(m: Message) {
     val text = m.blocks.firstOrNull { it.type == "text" && !it.text.isNullOrBlank() }?.text ?: return
@@ -431,7 +431,7 @@ private fun SystemDivider(m: Message) {
 }
 
 // ---------------------------------------------------------------------------
-// 用户消息:右对齐珊瑚渐变气泡
+// User message: right-aligned coral gradient bubble
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -457,7 +457,7 @@ private fun UserMessage(m: Message) {
 }
 
 // ---------------------------------------------------------------------------
-// assistant 消息:玻璃卡,按 blocks 渲染
+// assistant message: glass card, rendered by blocks
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -485,18 +485,18 @@ private fun AssistantMessage(m: Message, resultMap: Map<String, ContentBlock>) {
                         val res = b.id?.let { resultMap[it] }
                         ToolBlock(b, res)
                     }
-                    // tool_result 不在 assistant 卡里直接渲染(已折进对应 tool_use)
+                    // tool_result isn't rendered directly in the assistant card (already folded into its tool_use)
                 }
             }
         }
     }
 }
 
-// 极简内联 markdown:**粗体** 与 `行内代码`。解析不了就当纯文本。
+// Minimal inline markdown: **bold** and `inline code`. Anything that won't parse is treated as plain text.
 private fun renderInline(src: String): AnnotatedString = buildAnnotatedString {
     var i = 0
     while (i < src.length) {
-        // **粗体**
+        // **bold**
         if (src.startsWith("**", i)) {
             val end = src.indexOf("**", i + 2)
             if (end > i + 1) {
@@ -505,7 +505,7 @@ private fun renderInline(src: String): AnnotatedString = buildAnnotatedString {
                 continue
             }
         }
-        // `行内代码`
+        // `inline code`
         if (src[i] == '`') {
             val end = src.indexOf('`', i + 1)
             if (end > i) {
@@ -526,7 +526,7 @@ private fun renderInline(src: String): AnnotatedString = buildAnnotatedString {
 }
 
 // ---------------------------------------------------------------------------
-// thinking 折叠块
+// thinking collapsible block
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -534,7 +534,7 @@ private fun ThinkingBlock(text: String) {
     var open by remember { mutableStateOf(false) }
     Column(Modifier.padding(vertical = 3.dp)) {
         Text(
-            "${if (open) "▼" else "▶"} 💭 思考",
+            "${if (open) "▼" else "▶"} 💭 Thinking",
             color = C.dim,
             fontSize = 13.sp,
             modifier = Modifier
@@ -555,7 +555,7 @@ private fun ThinkingBlock(text: String) {
 }
 
 // ---------------------------------------------------------------------------
-// 工具折叠块:头部图标+摘要+状态;展开显示 input 详情 + tool_result
+// Tool collapsible block: header icon + summary + status; expanded shows input details + tool_result
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -572,7 +572,7 @@ private fun ToolBlock(block: ContentBlock, result: ContentBlock?) {
         radius = 18.dp,
     ) {
         Column {
-            // 头部
+            // Header
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -605,12 +605,12 @@ private fun ToolBlock(block: ContentBlock, result: ContentBlock?) {
                     fontWeight = FontWeight.Bold,
                 )
             }
-            // 展开体
+            // Expanded body
             if (open) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .background(Color(0x14BEA08C)) // 顶部分隔的淡色;近似 d8 的 border-top 区
+                        .background(Color(0x14BEA08C)) // Light tint for the top divider; approximates d8's border-top area
                         .padding(horizontal = 15.dp, vertical = 11.dp),
                 ) {
                     ToolInputView(block.name, block.input)
@@ -618,7 +618,7 @@ private fun ToolBlock(block: ContentBlock, result: ContentBlock?) {
                         val out = trunc(contentToText(result.content))
                         if (out.isNotEmpty()) {
                             Spacer(Modifier.size(8.dp))
-                            Text("输出", color = C.dim, fontSize = 11.sp)
+                            Text("Output", color = C.dim, fontSize = 11.sp)
                             Spacer(Modifier.size(2.dp))
                             Text(
                                 out,
@@ -635,20 +635,20 @@ private fun ToolBlock(block: ContentBlock, result: ContentBlock?) {
     }
 }
 
-// 工具 input 详情:Bash 显示命令;Edit/Write 显示路径 + diff 染色;其它显示 JSON。
+// Tool input details: Bash shows the command; Edit/Write show the path + colored diff; everything else shows JSON.
 @Composable
 private fun ToolInputView(name: String?, input: JsonElement?) {
     when (name) {
         "Bash" -> CodeText(input.str("command") ?: "")
         "Edit", "MultiEdit" -> {
             input.str("file_path")?.let { PathText(it) }
-            // 单 Edit:old_string / new_string;MultiEdit 简化为也走单条(只展示对象里的 old/new 若有)
+            // Single Edit: old_string / new_string; MultiEdit is simplified to the single-edit path too (only shows the object's old/new if present)
             val oldS = input.str("old_string")
             val newS = input.str("new_string")
             if (oldS != null || newS != null) {
                 DiffLines(oldS, newS)
             } else {
-                // MultiEdit 的 edits 数组等复杂结构:JSON 兜底
+                // Complex structures like MultiEdit's edits array: JSON fallback
                 CodeText(trunc((input as? JsonObject)?.get("edits")?.toString() ?: input.toString(), 1200))
             }
         }
@@ -671,7 +671,7 @@ private fun PathText(s: String) {
     Text(s, color = C.accent, fontFamily = mono, fontSize = 12.sp, modifier = Modifier.padding(bottom = 2.dp))
 }
 
-// diff 染色:old 行红(-)、new 行绿(+)
+// Diff coloring: old lines red (-), new lines green (+)
 @Composable
 private fun DiffLines(oldS: String?, newS: String?) {
     Column(Modifier.padding(top = 4.dp)) {
@@ -703,7 +703,7 @@ private fun DiffLines(oldS: String?, newS: String?) {
 }
 
 // ---------------------------------------------------------------------------
-// 5. 流式"正在生成"卡
+// 5. Streaming "generating" card
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -721,12 +721,12 @@ private fun StreamingCard(text: String) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. live 心跳行
+// 6. Live heartbeat row
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun LiveBeat(phase: String, sentAt: Long, outputTokens: Int) {
-    // 每 ~300ms 刷新一次耗时显示
+    // Refresh the elapsed-time display about every 300ms
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(sentAt, phase) {
         while (true) {
@@ -735,13 +735,13 @@ private fun LiveBeat(phase: String, sentAt: Long, outputTokens: Int) {
         }
     }
     val elapsed = ((now - sentAt) / 1000).coerceAtLeast(0)
-    val label = if (phase == "sent") "已发送 · 等待响应…" else "生成中"
+    val label = if (phase == "sent") "Sent · waiting…" else "Generating"
     Row(
         Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // 珊瑚发光点
+        // Coral glowing dot
         Box(
             Modifier
                 .size(7.dp)
@@ -749,7 +749,7 @@ private fun LiveBeat(phase: String, sentAt: Long, outputTokens: Int) {
                 .background(C.accent)
         )
         Text(
-            "$label · 本轮 ${kfmt(outputTokens)} tok ↑ · ${elapsed}s",
+            "$label · this turn ${kfmt(outputTokens)} tok ↑ · ${elapsed}s",
             color = C.accent,
             fontSize = 12.sp,
             fontFamily = mono,
@@ -767,7 +767,7 @@ private fun Composer(busy: Boolean, onSend: (String) -> Unit, onInterrupt: () ->
     Row(
         Modifier
             .fillMaxWidth()
-            // 键盘弹起=顶上 ime 高度(正好贴键盘);收起=导航栏高度。取 max,单次计算不叠加。
+            // Keyboard up = top inset of ime height (sits right on the keyboard); down = nav bar height. Take the max; single computation, no stacking.
             .padding(WindowInsets.ime.union(WindowInsets.navigationBars).asPaddingValues())
             .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -783,7 +783,7 @@ private fun Composer(busy: Boolean, onSend: (String) -> Unit, onInterrupt: () ->
                     .padding(horizontal = 20.dp, vertical = 15.dp),
             ) {
                 if (text.isEmpty()) {
-                    Text("发消息给 Claude…", color = C.dim, fontSize = 14.5f.sp)
+                    Text("Message Claude…", color = C.dim, fontSize = 14.5f.sp)
                 }
                 BasicTextField(
                     value = text,
@@ -794,7 +794,7 @@ private fun Composer(busy: Boolean, onSend: (String) -> Unit, onInterrupt: () ->
                 )
             }
         }
-        // 发送 / 中断 圆形按钮
+        // Send / interrupt round button
         Box(
             Modifier
                 .size(48.dp)

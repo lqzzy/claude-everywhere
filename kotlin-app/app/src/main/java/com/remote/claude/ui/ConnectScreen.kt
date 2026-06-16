@@ -31,9 +31,9 @@ import androidx.compose.ui.unit.sp
 import com.remote.claude.AppViewModel
 import com.remote.claude.ui.theme.C
 
-// 首启 / 未配置时的「连接」页。
-// 主路径:用手机系统相机扫电脑终端(install.sh)打印的二维码 → 自动唤起本页并连接。
-// 兜底:在这里手动填写服务器地址 + 令牌。
+// The "Connect" screen shown on first launch / when not yet configured.
+// Primary path: scan the QR code printed by the terminal (install.sh) with the phone's camera → this screen opens and connects automatically.
+// Fallback: manually enter the server address + token here.
 @Composable
 fun ConnectScreen(vm: AppViewModel) {
     var url by remember { mutableStateOf("ws://") }
@@ -51,16 +51,16 @@ fun ConnectScreen(vm: AppViewModel) {
             Text("Claude Everywhere", color = C.ink, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.height(10.dp))
             Text(
-                "在电脑上运行 ./install.sh,用手机相机扫描终端里的二维码即可自动连接。\n或在下面手动填写:",
+                "Run ./install.sh on your computer and scan the QR code in the terminal with your phone's camera to connect automatically.\nOr enter it manually below:",
                 color = C.subtle,
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
             )
             Spacer(Modifier.height(22.dp))
 
-            Field(label = "服务器地址", value = url, placeholder = "ws://100.x.x.x:4000", mono = true) { url = it }
+            Field(label = "Server address", value = url, placeholder = "ws://100.x.x.x:4000", mono = true) { url = it }
             Spacer(Modifier.height(12.dp))
-            Field(label = "令牌 (token)", value = token, placeholder = "粘贴电脑上显示的令牌", mono = true) { token = it }
+            Field(label = "Token", value = token, placeholder = "Paste the token shown on your computer", mono = true) { token = it }
 
             Spacer(Modifier.height(24.dp))
             val ready = url.trim().startsWith("ws") && token.isNotBlank()
@@ -73,7 +73,7 @@ fun ConnectScreen(vm: AppViewModel) {
                     .padding(vertical = 15.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("连接", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Connect", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -102,5 +102,5 @@ private fun Field(label: String, value: String, placeholder: String, mono: Boole
     }
 }
 
-// 未就绪时按钮的灰底
+// gray fill for the button when not ready
 private fun solidDim() = androidx.compose.ui.graphics.SolidColor(Color(0x33000000))

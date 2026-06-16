@@ -1,4 +1,4 @@
-// 验证重构:两轮对话(第二轮走 resume)+ 落盘 jsonl 可被终端 resume。
+// Verify the refactor: two conversation turns (the second goes through resume) + the persisted jsonl can be resumed from the terminal.
 import "dotenv/config";
 import { WebSocket } from "ws";
 import { existsSync } from "node:fs";
@@ -18,8 +18,8 @@ let stream2 = 0;
 
 const log = (...a: any[]) => console.log("[verify]", ...a);
 
-ws.on("open", () => log("已连接"));
-ws.on("error", (e) => { console.error("ws 错误", e); process.exit(1); });
+ws.on("open", () => log("connected"));
+ws.on("error", (e) => { console.error("ws error", e); process.exit(1); });
 
 ws.on("message", (data) => {
   const e = JSON.parse(data.toString());
@@ -27,19 +27,19 @@ ws.on("message", (data) => {
     case "session.list":
       if (!started) {
         started = true;
-        log("发起会话(第 1 轮)…");
-        ws.send(JSON.stringify({ t: "session.start", prompt: "用一句话回答:中国的首都是哪?直接回答,不要用任何工具。" }));
+        log("Starting session (turn 1)…");
+        ws.send(JSON.stringify({ t: "session.start", prompt: "Answer in one sentence: what is the capital of China? Answer directly, don't use any tools." }));
       }
       break;
     case "session.created":
       appId = e.session.id;
       cwd = e.session.cwd;
-      log(`会话已建 id=${appId.slice(0, 8)} cwd=${cwd}`);
+      log(`Session created id=${appId.slice(0, 8)} cwd=${cwd}`);
       break;
     case "session.updated":
       if (e.session.claudeSessionId && !claudeId) {
         claudeId = e.session.claudeSessionId;
-        log(`拿到 claudeSessionId=${claudeId.slice(0, 8)} (==appId? ${claudeId === appId})`);
+        log(`Got claudeSessionId=${claudeId.slice(0, 8)} (==appId? ${claudeId === appId})`);
       }
       break;
     case "message.delta":
@@ -48,35 +48,35 @@ ws.on("message", (data) => {
     case "turn":
       if (e.turn.phase === "done") {
         doneCount++;
-        log(`第 ${doneCount} 轮完成 (out≈${e.turn.outputTokens} tok)`);
+        log(`Turn ${doneCount} done (out≈${e.turn.outputTokens} tok)`);
         if (doneCount === 1) {
-          log("发第 2 轮(走 resume)…");
-          ws.send(JSON.stringify({ t: "session.input", id: appId, text: "再用一句话回答:那美国的首都呢?同样不要用工具。" }));
+          log("Sending turn 2 (via resume)…");
+          ws.send(JSON.stringify({ t: "session.input", id: appId, text: "Again in one sentence: and what about the capital of the United States? Same as before, don't use tools." }));
         } else if (doneCount === 2) {
-          setTimeout(finish, 800); // 等磁盘 flush
+          setTimeout(finish, 800); // wait for disk flush
         }
       }
       break;
     case "error":
-      console.error("[verify] 服务错误:", e.message);
+      console.error("[verify] server error:", e.message);
       break;
   }
 });
 
 function finish() {
-  log(`流式字符: 第1轮=${stream1} 第2轮=${stream2}`);
+  log(`Streamed chars: turn1=${stream1} turn2=${stream2}`);
   const file = join(homedir(), ".claude", "projects", cwd.replace(/\//g, "-"), `${claudeId}.jsonl`);
   const ok = existsSync(file);
-  log(`磁盘 transcript: ${file}`);
-  log(ok ? "✓ 文件存在 → 终端可 `claude --resume " + claudeId.slice(0, 8) + "…` 续聊" : "✗ 文件不存在!");
-  console.log("\n========== 结论 ==========");
-  console.log(`两轮均完成: ${doneCount === 2 ? "✓" : "✗"}`);
-  console.log(`两轮都有流式输出: ${stream1 > 0 && stream2 > 0 ? "✓" : "✗"}`);
-  console.log(`claudeSessionId==appId(首轮 sessionId 生效): ${claudeId === appId ? "✓" : "✗"}`);
-  console.log(`落盘可 resume: ${ok ? "✓" : "✗"}`);
-  console.log(`APPID=${appId}`); // 供后续手动 resume 验证
+  log(`Disk transcript: ${file}`);
+  log(ok ? "✓ File exists → terminal can continue the chat with `claude --resume " + claudeId.slice(0, 8) + "…`" : "✗ File does not exist!");
+  console.log("\n========== Conclusion ==========");
+  console.log(`Both turns completed: ${doneCount === 2 ? "✓" : "✗"}`);
+  console.log(`Both turns streamed output: ${stream1 > 0 && stream2 > 0 ? "✓" : "✗"}`);
+  console.log(`claudeSessionId==appId (first-turn sessionId took effect): ${claudeId === appId ? "✓" : "✗"}`);
+  console.log(`Persisted and resumable: ${ok ? "✓" : "✗"}`);
+  console.log(`APPID=${appId}`); // for later manual resume verification
   ws.close();
   process.exit(ok && doneCount === 2 && stream1 > 0 && stream2 > 0 ? 0 : 1);
 }
 
-setTimeout(() => { console.error("[verify] 超时"); process.exit(1); }, 90000);
+setTimeout(() => { console.error("[verify] timeout"); process.exit(1); }, 90000);

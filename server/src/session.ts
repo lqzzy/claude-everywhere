@@ -1,5 +1,5 @@
-// 重构后的会话层:server 无状态,每条消息 = 一次性 query() 跑完即退;
-// 会话元数据指针落地 ~/.claude-remote/sessions.json,真相留在磁盘 jsonl。
+// The refactored session layer: the server is stateless, each message = a one-shot query() that exits when done;
+// the session metadata pointers are persisted to ~/.claude-remote/sessions.json, while the source of truth stays in the on-disk jsonl.
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -14,13 +14,13 @@ export function emptyUsage(): UsageInfo {
 const STORE_DIR = join(homedir(), ".claude-remote");
 const STORE_FILE = join(STORE_DIR, "sessions.json");
 
-// appId → SessionSummary 指针表,落地 JSON。server 重启不丢。
+// appId → SessionSummary pointer table, persisted as JSON. Survives server restarts.
 export class SessionStore {
   private sessions = new Map<string, SessionSummary>();
 
   constructor(private defaults: { contextLimit: number }) {}
 
-  // 从磁盘读入内存;文件不存在则空。载入后清理瞬时态(没有 live 轮次在跑)。
+  // Load from disk into memory; empty if the file doesn't exist. After loading, clear transient state (no live turn is running).
   load(): void {
     try {
       if (!existsSync(STORE_FILE)) return;
@@ -33,7 +33,7 @@ export class SessionStore {
         this.sessions.set(s.id, s);
       }
     } catch {
-      // 坏文件:保持空,不让进程崩
+      // Bad file: stay empty, don't crash the process
     }
   }
 
@@ -42,7 +42,7 @@ export class SessionStore {
       if (!existsSync(STORE_DIR)) mkdirSync(STORE_DIR, { recursive: true });
       writeFileSync(STORE_FILE, JSON.stringify([...this.sessions.values()], null, 2), "utf8");
     } catch {
-      // 写失败不让进程崩
+      // A failed write must not crash the process
     }
   }
 
@@ -90,7 +90,7 @@ export class SessionStore {
     this.persist();
   }
 
-  // 直接放入一条完整 summary(导入历史会话用)
+  // Insert a complete summary directly (used for importing historical sessions)
   put(summary: SessionSummary): SessionSummary {
     this.sessions.set(summary.id, summary);
     this.persist();
@@ -102,8 +102,8 @@ export class SessionStore {
   }
 }
 
-// 跨语言粗略 token 估计:CJK ~0.6 token/字,其他(英文/代码)~0.25 token/字。
-// 流式期间没有权威 token,用它做平滑心跳;末尾 message_delta 的真实 output_tokens 会取 max 校正。
+// Rough cross-language token estimate: CJK ~0.6 token/char, everything else (English/code) ~0.25 token/char.
+// During streaming there's no authoritative token count, so use this for a smooth heartbeat; the real output_tokens from the final message_delta corrects it via max.
 function estTokens(s: string): number {
   let cjk = 0;
   let other = 0;
@@ -130,10 +130,10 @@ function toBlock(b: any): ContentBlock {
   }
 }
 
-// 跑一轮对话:一次性 query(),把 SDK 事件流映射成线协议,跑完即退。
+// Run one conversation turn: a one-shot query() that maps the SDK event stream onto the wire protocol, then exits when done.
 export async function runTurn(opts: {
   store: SessionStore;
-  activeTurns: Map<string, { interrupt: () => void }>; // appId → 当前轮句柄,供 interrupt
+  activeTurns: Map<string, { interrupt: () => void }>; // appId → current turn handle, for interrupt
   id: string;
   text: string;
   emit: (e: ServerEvent) => void;
@@ -143,7 +143,7 @@ export async function runTurn(opts: {
   const meta = store.get(id);
   if (!meta) return;
 
-  // 1) 构造并发出用户消息
+  // 1) Build and emit the user message
   const userMessage: Message = {
     id: randomUUID(),
     role: "user",
@@ -153,11 +153,11 @@ export async function runTurn(opts: {
   emit({ t: "message.complete", id, message: userMessage });
   store.update(id, { preview: text, previewRole: "user" });
 
-  // 2) 开新一轮(闭包局部状态,代替旧版的 this.xxx)
+  // 2) Start a new turn (closure-local state, replacing the old this.xxx)
   let currentTurn: TurnInfo = { phase: "sent", sentAt: Date.now(), inputTokens: 0, outputTokens: 0 };
   let currentMessageId = "";
-  let liveTokEst = 0; //   流式累计 token 估计(平滑心跳)
-  let lastTurnEmit = 0; // turn 节流时间戳
+  let liveTokEst = 0; //   running streamed token estimate (smooth heartbeat)
+  let lastTurnEmit = 0; // turn throttle timestamp
 
   emit({ t: "turn", id, turn: { ...currentTurn } });
   store.update(id, { status: "thinking" });
@@ -166,17 +166,17 @@ export async function runTurn(opts: {
   const emitTurn = (phase: TurnInfo["phase"], force = false) => {
     currentTurn.phase = phase;
     const now = Date.now();
-    if (!force && phase === "generating" && now - lastTurnEmit < 150) return; // 最快 ~150ms 一次
+    if (!force && phase === "generating" && now - lastTurnEmit < 150) return; // at most ~once every 150ms
     lastTurnEmit = now;
     emit({ t: "turn", id, turn: { ...currentTurn } });
   };
 
-  // 3) 组装 options(复用旧写法,补 allowDangerouslySkipPermissions + resume/sessionId 分流)
+  // 3) Assemble options (reusing the old approach, adding allowDangerouslySkipPermissions + resume/sessionId routing)
   const options: any = {
     cwd: meta.cwd,
     includePartialMessages: true,
     permissionMode: "bypassPermissions",
-    allowDangerouslySkipPermissions: true, // bypassPermissions 必须配它,否则 SDK 报错
+    allowDangerouslySkipPermissions: true, // bypassPermissions requires this, otherwise the SDK errors out
     canUseTool: (toolName: string, input: any) => {
       store.update(id, { currentActivity: { tool: toolName, input }, status: "tool" });
       emit({ t: "session.updated", session: store.get(id)! });
@@ -185,14 +185,14 @@ export async function runTurn(opts: {
     stderr: () => {},
   };
   if (meta.model && meta.model !== "default") options.model = meta.model;
-  if (meta.claudeSessionId) options.resume = meta.claudeSessionId; // 续聊:从最新磁盘状态 resume
-  else options.sessionId = id; //                                   首轮:用 appId 作为 claude 会话 id
+  if (meta.claudeSessionId) options.resume = meta.claudeSessionId; // continuation: resume from the latest disk state
+  else options.sessionId = id; //                                   first turn: use the appId as the claude session id
 
   const handleStream = (event: any) => {
     if (!event) return;
     if (event.type === "message_start") {
       currentMessageId = randomUUID();
-      // message_start 立刻带来本轮 input(含 cache)用量 → 上下文占用 + 心跳起点
+      // message_start immediately brings this turn's input (including cache) usage → context usage + heartbeat starting point
       const u = event.message?.usage;
       if (u) {
         currentTurn.inputTokens =
@@ -202,7 +202,7 @@ export async function runTurn(opts: {
       }
       store.update(id, { status: "thinking" });
     } else if (event.type === "message_delta") {
-      // 权威累计 output_tokens;取 max 不让数字回退
+      // Authoritative cumulative output_tokens; take max so the number never goes backwards
       const u = event.usage;
       if (u && typeof u.output_tokens === "number") {
         currentTurn.outputTokens = Math.max(currentTurn.outputTokens, u.output_tokens);
@@ -210,7 +210,7 @@ export async function runTurn(opts: {
       }
     } else if (event.type === "content_block_delta") {
       const d = event.delta;
-      // 每个增量都让 outputTokens 按字符上涨 → 平滑心跳(只有真在产出才会涨)
+      // Every delta bumps outputTokens up by character count → smooth heartbeat (only rises when something is actually being produced)
       if (d?.type === "text_delta" || d?.type === "thinking_delta") {
         liveTokEst += estTokens(d.text ?? d.thinking ?? "");
         currentTurn.outputTokens = Math.max(currentTurn.outputTokens, Math.round(liveTokEst));
@@ -267,7 +267,7 @@ export async function runTurn(opts: {
     if (!blocks.length) return;
     const m: Message = { id: randomUUID(), role: "user", blocks, ts: Date.now() };
     emit({ t: "message.complete", id, message: m });
-    // 工具结果回来了 → 当前活动清空
+    // Tool result came back → clear the current activity
     store.update(id, { currentActivity: undefined });
     emit({ t: "activity", id, tool: null });
   };
@@ -286,9 +286,9 @@ export async function runTurn(opts: {
   };
 
   const handleResult = (msg: any) => {
-    // result 带本轮权威用量(含工具往返),累加为会话累计
+    // result carries this turn's authoritative usage (including tool round-trips), accumulated into the session total
     addUsage(msg?.usage);
-    // 用真实模型上下文窗口校正 contextLimit(如 Opus 1M),让 Context% 准确
+    // Correct contextLimit using the real model context window (e.g. Opus 1M) so Context% is accurate
     const mu = msg?.modelUsage;
     if (mu) {
       const cw = (Object.values(mu)[0] as any)?.contextWindow;
@@ -309,7 +309,7 @@ export async function runTurn(opts: {
     switch (msg?.type) {
       case "system":
         if (msg.subtype === "init") {
-          // 续聊不分叉的关键:每轮都把 claudeSessionId 指针更新成最新
+          // The key to continuing without forking: every turn updates the claudeSessionId pointer to the latest value
           store.update(id, {
             claudeSessionId: msg.session_id ?? store.get(id)?.claudeSessionId,
             model: msg.model ?? meta.model,
@@ -333,7 +333,7 @@ export async function runTurn(opts: {
     }
   };
 
-  // 4) 开跑这一轮的一次性 query()
+  // 4) Kick off this turn's one-shot query()
   const q: any = query({ prompt: text, options });
   activeTurns.set(id, q);
 
@@ -343,7 +343,7 @@ export async function runTurn(opts: {
     emit({ t: "error", message: `session ${id}: ${String(e)}` });
   } finally {
     activeTurns.delete(id);
-    // 兜底:若 status 仍非 idle,复位
+    // Fallback: if status is still not idle, reset it
     const cur = store.get(id);
     if (cur && cur.status !== "idle") {
       store.update(id, { status: "idle", currentActivity: undefined });

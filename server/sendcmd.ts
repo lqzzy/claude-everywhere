@@ -1,4 +1,4 @@
-// 测试辅助:给最近的会话发一条指令(走 WS,和 App 同源),用于触发工具/权限流程。
+// Test helper: send one command to the most recent session (over WS, same path as the App), to trigger the tool/permission flow.
 import "dotenv/config";
 import { WebSocket } from "ws";
 
@@ -11,11 +11,11 @@ ws.on("message", (d) => {
   const e = JSON.parse(d.toString());
   if (e.t === "session.list") {
     if (!e.sessions.length) {
-      console.log("没有会话");
+      console.log("No sessions");
       process.exit(1);
     }
     const id = e.sessions[0].id;
-    console.log("发到会话", id.slice(0, 8), "->", text);
+    console.log("Sending to session", id.slice(0, 8), "->", text);
     ws.send(JSON.stringify({ t: "session.input", id, text }));
     setTimeout(() => process.exit(0), 1500);
   }

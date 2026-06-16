@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.remote.claude.ui.theme.C
 import com.remote.claude.ui.theme.Coral
 
-// 暖白渐变底 + 三个模糊光斑(minSdk 31:Modifier.blur 用系统 RenderEffect)。
+// Warm-white gradient background + three blurred light blobs (minSdk 31: Modifier.blur uses the system RenderEffect).
 @Composable
 fun BlobBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     Box(
@@ -49,7 +49,7 @@ fun BlobBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.
     }
 }
 
-// 流内玻璃卡片:半透明白 + 白边 + 左上镜面高光叠层。
+// Inline glass card: translucent white + white border + top-left specular highlight overlay.
 @Composable
 fun Glass(
     modifier: Modifier = Modifier,
@@ -76,5 +76,5 @@ fun Glass(
     }
 }
 
-// 珊瑚渐变 brush(用户气泡 / 发送按钮 / orb)。
+// Coral gradient brush (user bubble / send button / orb).
 fun coralBrush(): Brush = Brush.linearGradient(Coral)

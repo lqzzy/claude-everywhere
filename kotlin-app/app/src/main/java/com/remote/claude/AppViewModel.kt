@@ -17,10 +17,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-// 本轮流式缓冲(messageId 一致则累加)。
+// Streaming buffer for the current turn (accumulates while messageId stays the same).
 data class StreamBuf(val messageId: String, val text: String)
 
-// 整个 App 的 UI 状态(对应旧 zustand store)。
+// UI state for the entire app (the equivalent of the old zustand store).
 data class UiState(
     val connected: Boolean = false,
     val sessions: Map<String, SessionSummary> = emptyMap(),
@@ -28,51 +28,51 @@ data class UiState(
     val messages: Map<String, List<Message>> = emptyMap(),
     val streaming: Map<String, StreamBuf> = emptyMap(),
     val turns: Map<String, TurnInfo> = emptyMap(),
-    val current: String? = null, // 当前打开的会话 id;null = 在列表页
-    val importable: List<ImportableItem> = emptyList(), // 可导入的历史会话(点导入时拉取)
-    val historyFrom: Map<String, Int> = emptyMap(), // 已加载消息在全量中的起始下标;>0 表示上面还有更早的
-    val quota: UsageQuota? = null, // 订阅额度利用率(5h/7d)
-    val needsSetup: Boolean = false, // true=未配置服务器,显示「连接」页
+    val current: String? = null, // id of the currently open session; null = on the list screen
+    val importable: List<ImportableItem> = emptyList(), // importable past sessions (fetched when "Import" is tapped)
+    val historyFrom: Map<String, Int> = emptyMap(), // start index of loaded messages within the full history; >0 means there are older ones above
+    val quota: UsageQuota? = null, // subscription quota utilization (5h/7d)
+    val needsSetup: Boolean = false, // true = no server configured, show the "Connect" screen
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val client = RemoteClient()
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
-    private var pendingNew = false // 新建会话:拿到 id 后自动进入
-    private var loadingMore = setOf<String>() // 正在加载更早历史的会话(去重,防滚动时重复请求)
+    private var pendingNew = false // new session: auto-open it once we receive its id
+    private var loadingMore = setOf<String>() // sessions currently loading older history (deduped to avoid repeated requests while scrolling)
 
     init {
         viewModelScope.launch {
             client.connected.collect { c ->
                 val was = _state.value.connected
                 _state.update { it.copy(connected = c) }
-                // 断线重连成功(false→true):server 会自动补发 session.list 刷新列表;
-                // 若此刻正打开某会话,主动重订阅一次,把断线期间漏掉的消息从磁盘真相补全。
+                // On successful reconnect (false→true): the server automatically re-sends session.list to refresh the list;
+                // if a session is currently open, proactively re-subscribe once to backfill any messages missed during the outage from the on-disk source of truth.
                 if (c && !was) _state.value.current?.let { client.send(ClientCommand.SessionSubscribe(it)) }
             }
         }
         viewModelScope.launch { client.events.collect { handle(it) } }
-        // 有已保存的连接配置就直接连;否则进入「连接」页(首启 / 未配置)
+        // If there's a saved connection config, connect right away; otherwise go to the "Connect" screen (first launch / not configured)
         val saved = Config.load(getApplication())
         if (saved != null) client.configure(saved.url, saved.token)
         else _state.update { it.copy(needsSetup = true) }
     }
 
-    // 保存并(重)连接到新服务器:扫码 deep link 或「连接」页手动填写时调用。
+    // Save and (re)connect to a new server: called when scanning a deep link QR code or filling in the "Connect" screen manually.
     fun configure(url: String, token: String) {
         Config.save(getApplication(), url, token)
         _state.update { it.copy(needsSetup = false) }
         client.configure(url, token)
     }
 
-    // App 回到前台时调用:重订阅当前会话 = 从磁盘拉最新全量(含后台期间电脑端续聊 / 后台轮次的新消息)。
-    // 与"重连自动重订阅"互补:连接没断时由它即时刷新,连接断了则由重连回调兜底。
+    // Called when the app returns to the foreground: re-subscribe to the current session = pull the latest full history from disk (including new messages from the desktop continuing the chat / background turns while the app was backgrounded).
+    // Complements "auto re-subscribe on reconnect": when the connection never dropped, this refreshes immediately; when it did drop, the reconnect callback handles it as a fallback.
     fun refreshCurrent() {
         _state.value.current?.let { client.send(ClientCommand.SessionSubscribe(it)) }
     }
 
-    // ---- 动作 ----
+    // ---- Actions ----
     fun open(id: String) {
         client.send(ClientCommand.SessionSubscribe(id))
         _state.update { it.copy(current = id) }
@@ -89,7 +89,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun interrupt(id: String) = client.send(ClientCommand.SessionInterrupt(id))
     fun delete(id: String) = client.send(ClientCommand.SessionDelete(id))
     fun archive(id: String) = client.send(ClientCommand.SessionArchive(id))
-    // 加载更早一页:用已记录的 from 作为 before;from<=0 或正在加载则跳过
+    // Load one older page: use the recorded `from` as `before`; skip if from<=0 or already loading
     fun loadOlder(id: String) {
         val from = _state.value.historyFrom[id] ?: 0
         if (from <= 0 || id in loadingMore) return
@@ -100,7 +100,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun importSession(claudeSessionId: String, cwd: String) = client.send(ClientCommand.SessionImport(claudeSessionId, cwd))
     fun requestUsage() = client.send(ClientCommand.UsageGet)
 
-    // ---- 事件处理(对应旧 store 的 handle) ----
+    // ---- Event handling (the equivalent of the old store's handle) ----
     private fun handle(e: ServerEvent) {
         when (e) {
             is ServerEvent.SessionList -> _state.update {
@@ -156,8 +156,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val list = (st.messages[e.id] ?: emptyList()).toMutableList()
                 val idx = list.indexOfFirst { m -> m.id == e.message.id }
                 if (idx >= 0) {
-                    // SDK 对同一条 assistant 消息按 thinking/text/tool_use 分块多次下发(同 id),
-                    // 必须合并 blocks,否则后到的正文会被丢弃 → 文字"突然消失"。
+                    // The SDK sends a single assistant message in multiple chunks split by thinking/text/tool_use (with the same id),
+                    // so we must merge the blocks; otherwise later-arriving body text gets dropped → text "suddenly disappears".
                     val ex = list[idx]
                     list[idx] = ex.copy(blocks = ex.blocks + e.message.blocks)
                 } else {
@@ -176,9 +176,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
             is ServerEvent.ImportableList -> _state.update { it.copy(importable = e.items) }
             is ServerEvent.UsageQuotaEvent -> _state.update { it.copy(quota = e.quota) }
-            is ServerEvent.Activity -> Unit // currentActivity 走 session.updated,这里忽略
-            is ServerEvent.PermissionRequest -> Unit // 默认 bypass,不会发生
-            is ServerEvent.Error -> Unit // TODO: 可加 toast
+            is ServerEvent.Activity -> Unit // currentActivity comes via session.updated, so ignore it here
+            is ServerEvent.PermissionRequest -> Unit // permissions are bypassed by default, so this won't happen
+            is ServerEvent.Error -> Unit // TODO: could show a toast
         }
     }
 

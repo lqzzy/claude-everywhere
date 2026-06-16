@@ -19,8 +19,8 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
 
-// WebSocket 客户端:连服务、收事件(Flow)、发命令,断线自动重连。
-// 地址/令牌运行时可配(首启走「连接」页或扫码),configure() 即(重)连。
+// WebSocket client: connects to the server, receives events (as a Flow), sends commands, and auto-reconnects on disconnect.
+// The address/token are configurable at runtime (first launch via the "Connect" screen or QR scan); configure() (re)connects.
 class RemoteClient {
     @Volatile private var serverWs: String? = null
     @Volatile private var token: String = ""
@@ -33,17 +33,18 @@ class RemoteClient {
     private var ws: WebSocket? = null
     private var closed = false
 
-    // 事件用 UNLIMITED Channel 背书:onMessage 在 IO 线程会高频涌入(长回复逐字符的 message.delta
-    // 叠加 turn/usage/session.updated),而消费端在主线程还要跑昂贵的玻璃模糊渲染。旧版
-    // MutableSharedFlow(512)+tryEmit 在缓冲溢出时会"静默丢事件",表现为长回复只显示一半、
-    // message.complete 丢失要重进才出现。Channel.UNLIMITED + trySend 永不溢出,绝不丢事件。
+    // Events are backed by an UNLIMITED Channel: onMessage floods in at high frequency on the IO thread (character-by-character
+    // message.delta for long replies, stacked with turn/usage/session.updated), while the consumer on the main thread also has to run
+    // expensive frosted-glass blur rendering. The old MutableSharedFlow(512)+tryEmit would "silently drop events" on buffer overflow,
+    // showing up as long replies only rendering halfway, or a missing message.complete that only appeared after re-entering.
+    // Channel.UNLIMITED + trySend never overflows and never drops an event.
     private val _events = Channel<ServerEvent>(Channel.UNLIMITED)
     val events: Flow<ServerEvent> = _events.receiveAsFlow()
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
 
-    // 设置/更换服务器并(重)连接。用于首启配置或扫码切换。
+    // Set/change the server and (re)connect. Used for first-launch configuration or switching via QR scan.
     fun configure(url: String, token: String) {
         this.serverWs = url
         this.token = token
@@ -59,7 +60,7 @@ class RemoteClient {
     }
 
     private fun open() {
-        val url = serverWs ?: return // 未配置:不连,等 configure()
+        val url = serverWs ?: return // not configured: don't connect, wait for configure()
         val req = Request.Builder().url("$url?token=$token").build()
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -70,9 +71,9 @@ class RemoteClient {
                 val ev = try {
                     json.decodeFromString(ServerEvent.serializer(), text)
                 } catch (_: Exception) {
-                    return // 未知/坏事件:忽略,不崩
+                    return // unknown/malformed event: ignore it, don't crash
                 }
-                _events.trySend(ev) // UNLIMITED channel:必定成功,绝不丢事件
+                _events.trySend(ev) // UNLIMITED channel: always succeeds, never drops an event
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = reconnect()

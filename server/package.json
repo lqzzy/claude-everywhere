@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Claude Everywhere 中转服务:手机远程监控/控制电脑上的 Claude Code(Agent SDK 驱动)",
+  "description": "Claude Everywhere relay service: remotely monitor/control Claude Code on your computer from your phone (powered by the Agent SDK)",
   "scripts": {
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",

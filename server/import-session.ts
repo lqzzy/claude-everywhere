@@ -1,7 +1,7 @@
-// 把一个已有的 claude 会话(~/.claude/projects 里的 transcript)导入新 App 的会话列表。
-// 用法: npx tsx import-session.ts <claudeSessionId> [cwd]
-//   - 解析 transcript 生成卡片元数据,写进 ~/.claude-remote/sessions.json
-//   - 之后启动 server、打开 App 即可看到;点开按需读全量历史,发消息走 resume 续同一会话(不分叉)
+// Import an existing claude session (a transcript under ~/.claude/projects) into the new App's session list.
+// Usage: npx tsx import-session.ts <claudeSessionId> [cwd]
+//   - Parses the transcript to generate card metadata and writes it into ~/.claude-remote/sessions.json
+//   - After that, start the server and open the App to see it; tap to load the full history on demand, and sending a message continues the same session via resume (no forking)
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -9,7 +9,7 @@ import { homedir } from "node:os";
 const id = process.argv[2];
 const cwdArg = process.argv[3];
 if (!id) {
-  console.error("用法: npx tsx import-session.ts <claudeSessionId> [cwd]");
+  console.error("Usage: npx tsx import-session.ts <claudeSessionId> [cwd]");
   process.exit(1);
 }
 
@@ -31,7 +31,7 @@ function locate(): string | null {
 
 const file = locate();
 if (!file) {
-  console.error(`找不到会话 ${id} 的 transcript(~/.claude/projects 下没有该 jsonl)`);
+  console.error(`Could not find transcript for session ${id} (no such jsonl under ~/.claude/projects)`);
   process.exit(1);
 }
 
@@ -69,14 +69,14 @@ for (const ln of readFileSync(file, "utf8").split("\n")) {
   }
   if (o.timestamp) lastTs = Date.parse(o.timestamp) || lastTs;
 }
-// 粗略成本(Opus 量级,仅作仪表)
+// Rough cost (Opus-scale rates, for display only)
 usage.costUsd = +(((usage.inputTokens + usage.cacheCreationTokens) / 1e6) * 15 + (usage.outputTokens / 1e6) * 75 + (usage.cacheReadTokens / 1e6) * 1.5).toFixed(2);
 
-// 标题:若首条是 /goal 的 Stop-hook 包装,抽出引号里的目标;否则取首条用户文本
+// Title: if the first message is a /goal Stop-hook wrapper, extract the goal from inside the quotes; otherwise use the first user text
 let title = firstUser;
 const m = firstUser.match(/condition:\s*"([^"]+)"/);
 if (m) title = m[1];
-title = title.replace(/\s+/g, " ").trim().slice(0, 40) || "(导入会话)";
+title = title.replace(/\s+/g, " ").trim().slice(0, 40) || "(imported session)";
 
 const summary = {
   id,
@@ -106,10 +106,10 @@ arr = arr.filter((s) => s.id !== id);
 arr.push(summary);
 writeFileSync(STORE, JSON.stringify(arr, null, 2), "utf8");
 
-console.log("✓ 已导入会话列表:");
-console.log("  标题:", title);
-console.log("  id  :", id);
-console.log("  cwd :", summary.cwd);
-console.log("  预览:", summary.preview.slice(0, 50));
-console.log("  累计:", `${usage.inputTokens + usage.outputTokens} tok · $${usage.costUsd}`);
-console.log("现在启动 server(npm start)、打开 App 即可看到并续聊。");
+console.log("✓ Imported into the session list:");
+console.log("  Title  :", title);
+console.log("  id     :", id);
+console.log("  cwd    :", summary.cwd);
+console.log("  Preview:", summary.preview.slice(0, 50));
+console.log("  Total  :", `${usage.inputTokens + usage.outputTokens} tok · $${usage.costUsd}`);
+console.log("Now start the server (npm start) and open the App to see it and continue the chat.");
