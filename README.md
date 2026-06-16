@@ -127,7 +127,7 @@ cd claude-everywhere
 
 ### Get the app
 
-**Easiest — download the APK:** grab the latest `claude-everywhere-*.apk` from [**Releases**](https://github.com/lqzzy/claude-everywhere/releases) and install it (allow "install from unknown sources"). Android 12+.
+**Easiest — download the APK:** grab **[claude-everywhere.apk](https://github.com/lqzzy/claude-everywhere/releases/latest/download/claude-everywhere.apk)** from the [latest release](https://github.com/lqzzy/claude-everywhere/releases) and install it (allow "install from unknown sources"). Android 12+.
 
 **Or build from source:**
 ```bash
