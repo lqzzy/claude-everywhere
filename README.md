@@ -20,6 +20,26 @@
 
 You start a task on your computer, then walk away. On your phone you watch Claude Code think, run tools, and write code in real time — and when it drifts, you send one message to put it back on track. No laptop required.
 
+<details>
+<summary><strong>Contents</strong></summary>
+
+- [Why](#why)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Get started](#get-started)
+  - [Prerequisites](#prerequisites)
+  - [Set up Tailscale](#set-up-tailscale)
+  - [Run it](#run-it)
+  - [Get the app](#get-the-app)
+- [Configuration](#configuration)
+- [Security](#security)
+- [Permissions](#permissions)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+</details>
+
 ## Why
 
 **The programmer's job is changing.** As Claude Code gets better, more of the work becomes *describing* what you want and *reviewing* what comes back — and increasingly you don't touch the code at all. You point; it builds. The job becomes supervision: keep it aimed the right way, catch it when it wanders, approve it when it's right.
@@ -65,10 +85,18 @@ Phone app  ──WebSocket──>  relay service (Node/TS, Agent SDK)  ──res
 Tailscale puts your computer and phone on one private, encrypted network — each device gets a stable `100.x.y.z` address and the phone can reach the computer from anywhere, without exposing any port to the public internet.
 
 **Computer — macOS**
+
 ```bash
-brew install --cask tailscale     # or install "Tailscale" from the Mac App Store
+brew install --cask tailscale     # or get "Tailscale" from the Mac App Store
 ```
-Open the Tailscale app and sign in. (The app's CLI lives at `/Applications/Tailscale.app/Contents/MacOS/Tailscale`; `install.sh` finds it automatically. To use `tailscale` in your shell: `sudo ln -sf /Applications/Tailscale.app/Contents/MacOS/Tailscale /usr/local/bin/tailscale`.)
+
+Open the Tailscale app and sign in.
+
+> `install.sh` auto-detects the app's bundled CLI at `/Applications/Tailscale.app/Contents/MacOS/Tailscale`. To call `tailscale` from your shell, symlink it once:
+>
+> ```bash
+> sudo ln -sf /Applications/Tailscale.app/Contents/MacOS/Tailscale /usr/local/bin/tailscale
+> ```
 
 **Computer — Linux**
 ```bash
@@ -81,7 +109,11 @@ sudo tailscale up                 # opens a login URL — sign in
 2. Sign in with the **same account** as the computer.
 3. Toggle the VPN **on**.
 
-Verify on the computer with `tailscale status` — your phone should appear in the list.
+Verify the phone shows up:
+
+```bash
+tailscale status     # your phone should appear in the device list
+```
 
 ### Run it
 
