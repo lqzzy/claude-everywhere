@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- satellite dot (the "everywhere" orbiter) -->
+    <path
+        android:pathData="M75,46.5 A7.5,7.5 0 1 0 75,61.5 A7.5,7.5 0 1 0 75,46.5 Z"
+        android:fillColor="#FF6F52" />
+    <!-- bold C opening to the right -->
+    <path
+        android:pathData="M50,34 A20,20 0 1 0 50,74"
+        android:fillColor="#00000000"
+        android:strokeWidth="11"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="30" android:startY="34"
+                android:endX="70" android:endY="74">
+                <item android:offset="0" android:color="#FFAE8F" />
+                <item android:offset="1" android:color="#FF6F52" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
